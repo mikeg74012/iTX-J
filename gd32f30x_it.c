@@ -151,12 +151,12 @@ void EXTI10_15_IRQHandler (void)
 */
 void USART0_IRQHandler (void)
 {
-  if (RESET != usart_interrupt_flag_get(USART0, USART_INT_FLAG_TBE))
+  if (read_register (USART0, USART_STAT0) & (1 << 7))
   {
     /* write one byte to the transmit data register */
     UartTxIntCallback(COM_PORT_0);
   }
-  if (RESET != usart_interrupt_flag_get(USART0, USART_INT_FLAG_RBNE))
+  if (read_register (USART0, USART_STAT0) & (1 << 5))
   {
     /* read one byte from the receive data register */
     UartRxIntCallback(COM_PORT_0);
@@ -171,12 +171,12 @@ void USART0_IRQHandler (void)
 */
 void USART1_IRQHandler (void)
 {
-  if (RESET != usart_interrupt_flag_get(USART1, USART_INT_FLAG_TBE))
+  if (read_register (USART1, USART_STAT0) & (1 << 7))
   {
     /* write one byte to the transmit data register */
     UartTxIntCallback(COM_PORT_1);
   }
-  if (RESET != usart_interrupt_flag_get(USART1, USART_INT_FLAG_RBNE))
+  if (read_register (USART1, USART_STAT0) & (1 << 5))
   {
     /* read one byte from the receive data register */
     UartRxIntCallback(COM_PORT_1);
@@ -191,12 +191,12 @@ void USART1_IRQHandler (void)
 */
 void UART3_IRQHandler (void)
 {
-  if (RESET != usart_interrupt_flag_get(UART3, USART_INT_FLAG_RBNE))
+  if (read_register (USART3, USART_STAT0) & (1 << 5))
   {
     /* read one byte from the receive data register */
     UartRxIntCallback(COM_PORT_3);
   }
-  if (RESET != usart_interrupt_flag_get(UART3, USART_INT_FLAG_TBE))
+  if (read_register (USART3, USART_STAT0) & (1 << 7))
   {
     /* write one byte to the transmit data register */
     UartTxIntCallback(COM_PORT_3);
@@ -211,7 +211,7 @@ void UART3_IRQHandler (void)
 */
 void UART4_IRQHandler (void)
 {
-  if (RESET != usart_interrupt_flag_get(UART4, USART_INT_FLAG_RBNE))
+  if (read_register (USART4, USART_STAT0) & (1 << 5))
   {
     /* read one byte from the receive data register */
     UartRxIntCallback(COM_PORT_4);

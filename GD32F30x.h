@@ -21,6 +21,19 @@
 
 #define     DBG                 0xe0042000
 
+#define SPI0                0x40013000
+#define SPI1                0x40003800
+#define SPI2                0x40003c00
+
+#define SPI_CTL0            0x0000
+#define SPI_CTL1            0x0004
+#define SPI_STAT            0x0008
+#define SPI_DATA            0x000c
+#define SPI_QCTL            0x0080
+
+
+
+
 
 #define RTC                 0x40002800
 
@@ -278,13 +291,14 @@
 
 /* USART Register definitions */
 
-#define     USART_SR            0x0000
-#define     USART_DR            0x0004
-#define     USART_BRR           0x0008
-#define     USART_CR1           0x000c
-#define     USART_CR2           0x0010
-#define     USART_CR3           0x0014
-#define     USART_GTPR          0x0018
+#define     USART_STAT0         0x0000
+#define     USART_DATA          0x0004
+#define     USART_BAUD          0x0008
+#define     USART_CTL0          0x000c
+#define     USART_CTL1          0x0010
+#define     USART_CTL2          0x0014
+#define     USART_GP            0x0018
+#define     USART_CTL3          0x0080
 
 /* RCU Base definitions */
 
@@ -381,6 +395,7 @@ void     set_gpio_alternate (unsigned char val);
 unsigned long read_gpio     (unsigned char val);
 unsigned long read_gpio_output     (unsigned char val);
 void     set_gpio_multiple  (unsigned char val, unsigned short high_bits, unsigned short low_bits);
+void     set_gpio_high_speed (unsigned char val);
 
 
 #endif /* STM32_H_ */

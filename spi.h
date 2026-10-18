@@ -82,8 +82,7 @@ typedef struct
  */
 /* API */
 bool   SpiInitialise   (unsigned long base);
-bool   SpiDeInitialise (unsigned long base);
-bool   SpiTransfer     (unsigned long base, uint8_t * pBuf1, int Len1, uint8_t  * pBuf2, int Len2);
+bool SpiTransfer (unsigned long base, uint8_t * pBuf1, int Len1, uint8_t  * pBuf2, int Len2, spitransfer_e TransferType);
 
 /* Console Commands */
 int    SpiConsoleStats (int ArgCount, char **pArguments);

@@ -114,8 +114,6 @@
  *                                    PRIVATE MEMBER VARIABLES
  **************************************************************************************************
  */
-static spihandle_t SpiHandle;
-
 static uint8_t spiReadBuffer[SPI_BUFFER_SIZE];  // Is this really needed?
 
 
@@ -144,14 +142,11 @@ bool AccelWakeUp = false;
  * @param     None
  * @return    true on success, false on failure
  */
-bool AccelDriverInit (spibus_e SpiBus, spichipselect_t ChipSelect)
+bool AccelDriverInit (void)
 {
   /* Configure the SPI bus & chip select for this device */
-  SpiHandle.Bus = SpiBus;
-  SpiHandle.ChipSelect = ChipSelect;
-  SpiHandle.Mode = LSM6DSL_SPI_MODE;
-  SpiHandle.BitRate = LSM6DSL_SPI_BITRATE;
-  bool status = SpiInitialise(&SpiHandle);
+
+  bool status = SpiInitialise(ACCEL_SPI);
 
   if (status)
   {
@@ -221,10 +216,6 @@ bool AccelDriverInit (spibus_e SpiBus, spichipselect_t ChipSelect)
   
   write_register (AFIO, AFIO_EXTISS1, (read_register (AFIO, AFIO_EXTISS1) & ~(0xf << 12)) | (1 << 12));
   
-  
-  InterruptConfig.irqPrePriority = 5;
-  InterruptConfig.irqSubPriority = 0;
-  GpioConfigInterrupt(ACCEL_INT2_PORT, ACCEL_INT2_PIN, &InterruptConfig);
 
   /* start with the wake up interrupt disabled */
   AccelDriverDisableWakeUpInterrupt();
@@ -582,8 +573,7 @@ static bool drvSpiReadReg (uint8_t registerNumber, uint8_t *pData)
   writeData[1] = 0x00;
 
   /* make the transfer */
-  SpiHandle.TransferType = SPI_TRANSFER_TXRX;
-  retval = SpiTransfer(&SpiHandle, writeData, 1, pData, 1);
+  retval = SpiTransfer(ACCEL_SPI, writeData, 1, pData, 1, SPI_TRANSFER_TXRX);
 
   return retval;
 }
@@ -604,8 +594,7 @@ static bool drvSpiWriteReg (uint8_t registerNumber, uint8_t dataByte)
   writeData[0] = SPI_WRITE_CMD | registerNumber;
   writeData[1] = dataByte;
 
-  SpiHandle.TransferType = SPI_TRANSFER_TX;
-  retval = SpiTransfer(&SpiHandle, writeData, 2, NULL, 0);
+  retval = SpiTransfer(ACCEL_SPI, writeData, 2, NULL, 0, SPI_TRANSFER_TX);
 
   return retval;
 }
@@ -628,9 +617,7 @@ static bool drvSpiReadMultibyte (uint8_t registerNumber, uint8_t *pData, uint16_
     writeBuffer[0] = SPI_READ_CMD | registerNumber;
     memset(spiReadBuffer, 0, sizeof(spiReadBuffer));
 
-    /* make the transfer */
-    SpiHandle.TransferType = SPI_TRANSFER_TXRX;
-    retval = SpiTransfer(&SpiHandle, writeBuffer, 1, spiReadBuffer, length);
+    retval = SpiTransfer(ACCEL_SPI, writeBuffer, 1, spiReadBuffer, length, SPI_TRANSFER_TXRX);
 
     if (retval)
     {

@@ -174,10 +174,7 @@ void MotionMonitorTask (void const *argument)
   }
 
   /* Initialise Accelerometer */
-  spichipselect_t ChipSelect;
-  ChipSelect.Port = ACCEL_CS_PORT;
-  ChipSelect.Pin = ACCEL_CS_PIN;
-  AccelDriverInit(ACCEL_SPI, ChipSelect);
+  AccelDriverInit();
 
   /* Carry out Wake-Up Self-Test if required */
   PostWakeUpSelfTest(IMU);
@@ -692,11 +689,11 @@ static void SaveValuesBeforeSleep (void)
    RtcBkupWriteRegister(RTC_BACKUP_TIMESTAMP, RtcGetTimeStamp() % MM_SECOND_IN_HOUR);
    RtcBkupWriteRegister(RTC_BACKUP_BATTERY_VOLTAGE, BatteryMonitorGetVoltage());
   /* WKUP pin state */
-  (GpioReadPin(CHARGER_USB_DETECT_PORT, CHARGER_USB_DETECT_PIN) == IO_PIN_SET)?
+  (read_gpio (USB_DETECT))?
       SetLPSleepStatus(RTC_BKUP_USB_CABLE_FLAG): ResetLPSleepStatus(RTC_BKUP_USB_CABLE_FLAG);
-  (GpioReadPin(RED_BUTTON_PORT, RED_BUTTON_PIN) == IO_PIN_SET)?
+  (read_gpio(USER_BUTTON))?
       SetLPSleepStatus(RTC_BKUP_REDBUTTON_FLAG): ResetLPSleepStatus(RTC_BKUP_REDBUTTON_FLAG);
-  (GpioReadPin(ACCEL_INT2_PORT, ACCEL_INT2_PIN) == IO_PIN_SET)?
+  (read_gpio(IMU_INT2))?
       SetLPSleepStatus(RTC_BKUP_ACCEL_INT2_FLAG): ResetLPSleepStatus(RTC_BKUP_ACCEL_INT2_FLAG);
   (BatteryGetChargerState())? SetLPSleepStatus(RTC_BKUP_CHARGER_FLAG): ResetLPSleepStatus(RTC_BKUP_CHARGER_FLAG);
 }
@@ -989,13 +986,13 @@ static eMmState GetStandByWakeupCause (void)
   {
     dt += MM_SECOND_IN_HOUR;   /* hour roll over case correction */
   }
-  usb_cable_state = GpioReadPin(CHARGER_USB_DETECT_PORT, CHARGER_USB_DETECT_PIN);
-  red_buttone_state = GpioReadPin(RED_BUTTON_PORT, RED_BUTTON_PIN);
-  #ifdef GD32F30X_HD
+  usb_cable_state = read_gpio (USB_DETECT);
+  red_buttone_state = read_gpio (USER_BUTTON);
+#ifdef GD32F30X_HD
   if ((PMU_CS & PMU_FLAG_WAKEUP) == PMU_FLAG_WAKEUP)
-  #else
+#else
   if(__HAL_PWR_GET_FLAG(PWR_FLAG_WU) != RESET)
-  #endif
+#endif
   {
     TRACE_IMU("Wake-up (IMU)\r\n");
     WakeupCount = MM_WAKEUP_IMU_TIMEOUT;

@@ -3,6 +3,17 @@
 
 #define GD32F30X_HD
 
+#include "GD32F30x.h"
+
+#define ACCEL_SPI           SPI0
+#define PSRAM_SPI           SPI1
+#define GSM_UART            USART0
+#define WIFI_UART           USART1
+#define CONSOLE_UART        USART3
+#define GNSS_UART           USART4
+
+
+
 #define USB_CC2             defpin(PTA,1)
 #define TX_TO_WIFI          defpin(PTA,2)
 #define RX_FROM_WIFI        defpin(PTA,3)
@@ -30,17 +41,18 @@
 #define IMU_INT1            defpin(PTC,12)
 #define USB_DETECT          defpin(PTC,13)
 #define GNSS_TX             defpin(PTD,2)
-#define SPI2_MOSI           defpin(PTB,15)
-#define SPI2_MISO           defpin(PTB,14)
-#define SPI2_SCK            defpin(PTB,13)
+#define SPI1_MOSI           defpin(PTB,15)
+#define SPI1_MISO           defpin(PTB,14)
+#define SPI1_SCK            defpin(PTB,13)
 #define SPI_CS_SRAM         defpin(PTB,12)
 #define USER_BUTTON         defpin(PTB,11)
 #define I2C1_SDA            defpin(PTB,9)
 #define I2C1_SCL            defpin(PTB,8)
 #define IMU_INT2            defpin(PTB,7)
 #define SPI_CS_IMU          defpin(PTB,6)
-#define SPI1_MOSI           defpin(PTB,5)
-#define SPI1_MISO           defpin(PTB,4)
+#define SPI0_MOSI           defpin(PTB,5)   /* using spi0 */
+#define SPI0_MISO           defpin(PTB,4)   /* using spi0 */
+#define SPI0_SCK            defpin(PTB,3)   /* using spi0 */
 #define BOARD_VER_DETECT    defpin(PTB,1)
 #define GNSS_POWER_EN       defpin(PTB,0)
 

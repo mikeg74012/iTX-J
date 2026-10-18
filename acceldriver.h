@@ -42,7 +42,7 @@ extern bool AccelWakeUp;
  **************************************************************************************************
  */
 /* API */
-bool    AccelDriverInit                   (spibus_e SpiBus, spichipselect_t ChipSelect);
+bool    AccelDriverInit                   (void);
 int16_t AccelDriverGetAccelerationX       (void);
 int16_t AccelDriverGetAccelerationY       (void);
 int16_t AccelDriverGetAccelerationZ       (void);

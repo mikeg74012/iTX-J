@@ -40,6 +40,7 @@ typedef struct
 
 
 /* UART definition */
+#if 0
 typedef struct
 {
   uint32_t             Instance;                     /* USART/UART port register */
@@ -57,6 +58,7 @@ typedef struct
   SemaphoreHandle_t    SendMutex;                    /* makes sure Send and SentBuffer complete atomically */
   stream_t             Stream;
 } uart_t;
+#endif
 
 
 /*
@@ -70,7 +72,7 @@ static bool     UartSendString      (uint8_t uartIndex, uint8_t *pData);
 static uint32_t UartSendBuffer      (uint8_t uartIndex, uint8_t *pData, uint32_t Len);
 static bool     UartPut             (uint8_t uartIndex, uint8_t Data);
 static void     UartTxData          (uint8_t uartIndex);
-static void     UartErrorProcess    (uint8_t uartIndex);
+static void     UartErrorProcess    (unsigned long base);
 
 
 /*
@@ -79,8 +81,6 @@ static void     UartErrorProcess    (uint8_t uartIndex);
  **************************************************************************************************
  */
 /* UARTs  */
-static uart_t UART[NO_OF_UARTS];
-
 
 /*
  **************************************************************************************************
@@ -88,16 +88,6 @@ static uart_t UART[NO_OF_UARTS];
  * These functions are the interface between the stream function calls and the individual UARTs
  **************************************************************************************************
  */
-static bool     UartDataAvailable0  (void)                           {  return(UartDataAvailable(0));        }
-static bool     UartDataAvailable1  (void)                           {  return(UartDataAvailable(1));        }
-static bool     UartDataAvailable2  (void)                           {  return(UartDataAvailable(2));        }
-static bool     UartDataAvailable3  (void)                           {  return(UartDataAvailable(3));        }
-static bool     UartDataAvailable4  (void)                           {  return(UartDataAvailable(4));        }
-static uint8_t  UartGet0            (void)                           {  return(UartGet(0));                  }
-static uint8_t  UartGet1            (void)                           {  return(UartGet(1));                  }
-static uint8_t  UartGet2            (void)                           {  return(UartGet(2));                  }
-static uint8_t  UartGet3            (void)                           {  return(UartGet(3));                  }
-static uint8_t  UartGet4            (void)                           {  return(UartGet(4));                  }
 static bool     UartSendString0     (uint8_t *pData)                 {  return(UartSendString(0,pData));           }
 static bool     UartSendString1     (uint8_t *pData)                 {  return(UartSendString(1,pData));           }
 static bool     UartSendString2     (uint8_t *pData)                 {  return(UartSendString(2,pData));           }
@@ -127,29 +117,25 @@ static bool     UartPut4            (uint8_t Data)                   {  return(U
  * @param[in]   UartHandle - handle for the UART to initialise
  * @return      stream_t : pointer to the stream interface for this UART
  */
-stream_t * UARTInitialise (comport_e ComPort, uartconfig_t * UartConfig)
+stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
 {
-  /* find the correct UART structure */
-  int UartIndex = ComPort;
-
   /* Initialise the circular buffer module and create Tx and Rx buffers for this uart */
-  ringbufferInit();
-  UART[UartIndex].RxBufHandle = ringbufferCreate(&UART[UartIndex].RxBuf, cUARTRxBufferSize, 1);
-  UART[UartIndex].TxBufHandle = ringbufferCreate(&UART[UartIndex].TxBuf, cUARTTxBufferSize, 1);
+//  UART[UartIndex].RxBufHandle = ringbufferCreate(&UART[UartIndex].RxBuf, cUARTRxBufferSize, 1);
+//  UART[UartIndex].TxBufHandle = ringbufferCreate(&UART[UartIndex].TxBuf, cUARTTxBufferSize, 1);
 
   /* initialise the receive data semaphore for this port */
-  UART[UartIndex].RxSem = xSemaphoreCreateCounting(cUARTRxBufferSize, 0);
+//  UART[UartIndex].RxSem = xSemaphoreCreateCounting(cUARTRxBufferSize, 0);
 
   /* initialise the Send mutex for this port */
-  UART[UartIndex].SendMutex = xSemaphoreCreateBinary();
-  xSemaphoreGive(UART[UartIndex].SendMutex);
-  UART[UartIndex].UartBusy = false;
+//  UART[UartIndex].SendMutex = xSemaphoreCreateBinary();
+//  xSemaphoreGive(UART[UartIndex].SendMutex);
+//  UART[UartIndex].UartBusy = false;
 
   /* set up the uart specific parameters */
-  switch (UartIndex)
+  switch (base)
   {
-  case 0:
-    UART[UartIndex].Instance              = USART0;
+  case USART0:
+/*    UART[UartIndex].Instance              = USART0;
     UART[UartIndex].IRQn                  = USART0_IRQn;
     UART[UartIndex].RcuClock              = RCU_USART0;
     UART[UartIndex].Stream.Get            = UartGet0;
@@ -157,13 +143,17 @@ stream_t * UARTInitialise (comport_e ComPort, uartconfig_t * UartConfig)
     UART[UartIndex].Stream.Put            = UartPut0;
     UART[UartIndex].Stream.Send           = UartSendString0;
     UART[UartIndex].Stream.SendBuf        = UartSendBuffer0;
-
+*/
     /* Set up GPIO pins for this port */
-    rcu_periph_clock_enable(USART0_PORT_CLK);
-    gpio_init(USART0_TX_PORT, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, USART0_TX_PIN);
-    gpio_init(USART0_RX_PORT, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, USART0_RX_PIN);
+      
+    or_register (RCU, RCU_APB2EN, (1 << 14));
+    
+    set_gpio_input (RXD_FROM_MODEM);
+    set_gpio_alternate (TXD_TO_MODEM);
+    
     break;
-  case 1:
+  case USART1:
+/*
     UART[UartIndex].Instance              = USART1;
     UART[UartIndex].IRQn                  = USART1_IRQn;
     UART[UartIndex].RcuClock              = RCU_USART1;
@@ -172,23 +162,20 @@ stream_t * UARTInitialise (comport_e ComPort, uartconfig_t * UartConfig)
     UART[UartIndex].Stream.Put            = UartPut1;
     UART[UartIndex].Stream.Send           = UartSendString1;
     UART[UartIndex].Stream.SendBuf        = UartSendBuffer1;
-
+*/
+      
     /* Set up GPIO pins for this port */
-    rcu_periph_clock_enable(USART1_PORT_CLK);
-    gpio_init(USART1_TX_PORT, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, USART1_TX_PIN);
-    gpio_init(USART1_RX_PORT, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, USART1_RX_PIN);
+      
+    or_register (RCU, RCU_APB1EN, (1 << 17));
+    
+    set_gpio_input (RX_FROM_WIFI);
+    set_gpio_alternate (TX_TO_WIFI);
+
     break;
-  case 2:
-    UART[UartIndex].Instance              = USART2;
-    UART[UartIndex].IRQn                  = USART2_IRQn;
-    UART[UartIndex].RcuClock              = RCU_USART2;
-    UART[UartIndex].Stream.Get            = UartGet2;
-    UART[UartIndex].Stream.DataAvailable  = UartDataAvailable2;
-    UART[UartIndex].Stream.Put            = UartPut2;
-    UART[UartIndex].Stream.Send           = UartSendString2;
-    UART[UartIndex].Stream.SendBuf        = UartSendBuffer2;
-    break;
-  case 3:
+
+
+  case USART3:
+/*
     UART[UartIndex].Instance              = UART3;
     UART[UartIndex].IRQn                  = UART3_IRQn;
     UART[UartIndex].RcuClock              = RCU_UART3;
@@ -197,13 +184,19 @@ stream_t * UARTInitialise (comport_e ComPort, uartconfig_t * UartConfig)
     UART[UartIndex].Stream.Put            = UartPut3;
     UART[UartIndex].Stream.Send           = UartSendString3;
     UART[UartIndex].Stream.SendBuf        = UartSendBuffer3;
-
+*/
+      
     /* Set up GPIO pins for this port */
-    rcu_periph_clock_enable(UART3_PORT_CLK);
-    gpio_init(UART3_TX_PORT, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, UART3_TX_PIN);
-    gpio_init(UART3_RX_PORT, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, UART3_RX_PIN);
+
+    or_register (RCU, RCU_APB1EN, (1 << 19));
+    
+    set_gpio_input (DEBUG_RX);
+    set_gpio_alternate (DEBUG_TX);
+
     break;
-  case 4:
+    
+  case USART4:
+/*
     UART[UartIndex].Instance              = UART4;
     UART[UartIndex].IRQn                  = UART4_IRQn;
     UART[UartIndex].RcuClock              = RCU_UART4;
@@ -212,77 +205,49 @@ stream_t * UARTInitialise (comport_e ComPort, uartconfig_t * UartConfig)
     UART[UartIndex].Stream.Put            = UartPut4;
     UART[UartIndex].Stream.Send           = UartSendString4;
     UART[UartIndex].Stream.SendBuf        = UartSendBuffer4;
-
+*/
+      
     /* Set up GPIO pins for this port */
-    rcu_periph_clock_enable(UART4_PORT_CLK);
-//    gpio_init(UART4_TX_PORT, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, UART4_TX_PIN);
-    gpio_init(UART4_RX_PORT, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_50MHZ, UART4_RX_PIN);
+      
+    or_register (RCU, RCU_APB1EN, (1 << 20));
+    
+    set_gpio_input (GNSS_TX);
+    
     break;
   }
 
   /* Initialise the UART hardware */
-  rcu_periph_clock_enable(RCU_AF);
-  rcu_periph_clock_enable(UART[UartIndex].RcuClock);
-  usart_baudrate_set(UART[UartIndex].Instance, UartConfig->BaudRate);
-  usart_receive_config(UART[UartIndex].Instance, USART_RECEIVE_ENABLE);
-  if (UartIndex != COM_PORT_4)
+  
+  /* AF enable */
+  
+  or_register (RCU, RCU_APB2EN, (1 << 0));
+  
+  /* TODO the baud rate will need converting */
+  
+  write_register (base, USART_BAUD, UartConfig->BaudRate);
+  
+  /* Enable receive */
+  
+  or_register (base, USART_CTL0, (1 << 2));
+  
+  if (base != USART4)
   {
-    usart_transmit_config(UART[UartIndex].Instance, USART_TRANSMIT_ENABLE);
+      /* Enable transmit */
+      
+    or_register (base, USART_CTL0, (1 << 3));
   }
-  usart_enable(UART[UartIndex].Instance);
 
   /* USART interrupt configuration */
   nvic_irq_enable(UART[UartIndex].IRQn, 5, 0);
 
   /* enable UART Receive interrupt */
-  usart_interrupt_enable(UART[UartIndex].Instance, USART_INT_RBNE);
+
+    or_register (base, USART_CTL0, (1 << 5));
 
   return (&UART[UartIndex].Stream);
 }
 
 
-
-/**
- * @brief       De-initialise the UART
- * @param[in]   ComPort - handle for the uart to deinitialse
- * @return      none
- */
-void UARTDeInit (comport_e ComPort)
-{
-  /* stop interrupts */
-  usart_interrupt_disable(UART[ComPort].Instance, USART_INT_RBNE);
-  usart_interrupt_disable(UART[ComPort].Instance, USART_INT_TBE);
-
-  /* deinit the UART */
-  usart_deinit(UART[ComPort].Instance);
-
-  /* free the ring buffers */
-  ringbufferDestroy(UART[ComPort].RxBufHandle);
-  ringbufferDestroy(UART[ComPort].TxBufHandle);
-
-  /* delete the semaphores */
-  vSemaphoreDelete(UART[ComPort].RxSem);
-  vSemaphoreDelete(UART[ComPort].SendMutex);
-
-  UART[ComPort].IRQn = 0;
-}
-
-
-/*
- **************************************************************************************************
- *                                       GENERIC INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       This function determines whether data is available
- * @param[in]   none
- * @return      bool : true  = data available
- *                     false = no data available
- */
-static bool UartDataAvailable (uint8_t uartIndex)
-{
-  return (ringbufferDataAvailable (UART[uartIndex].RxBufHandle));
-}
 
 
 /**
@@ -315,13 +280,12 @@ static uint8_t UartGet (uint8_t uartIndex)
  * @return      bool  : true  = Success
  *                      false = Failure - the tx queue is full
  */
-static bool UartSendString (uint8_t uartIndex, uint8_t *pData)
+static bool UartSendString (unsigned long base, uint8_t *pData)
 {
   bool ret = true;
 
   /* add all the data to the transmit buffer. */
-  if (pdTRUE == xSemaphoreTake(UART[uartIndex].SendMutex, portMAX_DELAY))
-  {
+
     while (*pData != 0)
     {
       if (false == ringbufferPut(UART[uartIndex].TxBufHandle, pData))
@@ -332,13 +296,9 @@ static bool UartSendString (uint8_t uartIndex, uint8_t *pData)
     }
 
     /* if the uart is idle, we kick it off by enabling interrupts */
-    if (false == UART[uartIndex].UartBusy)
-    {
-      usart_interrupt_enable(UART[uartIndex].Instance, USART_INT_TBE);
-    }
-    xSemaphoreGive(UART[uartIndex].SendMutex);
-  }
 
+    or_register (base, USART_CTL0, (1 << 7));
+    
   return (ret);
 }
 
@@ -352,33 +312,27 @@ static bool UartSendString (uint8_t uartIndex, uint8_t *pData)
  * @paran[in]   Len      : the number of bytes to send
  * @return      uint32_t : the number of bytes actually sent (will be less then Len if buffer full)
  */
-static uint32_t UartSendBuffer (uint8_t uartIndex, uint8_t *pData, uint32_t Len)
+static uint32_t UartSendBuffer (unsigned long base, uint8_t *pData, uint32_t Len)
 {
   uint32_t BytesRemaining = Len;
 
   /* add all the data to the transmit buffer. */
-  if (pdTRUE == xSemaphoreTake(UART[uartIndex].SendMutex, portMAX_DELAY))
-  {
     while (BytesRemaining > 0)
     {
-      if (false == ringbufferPut(UART[uartIndex].TxBufHandle, pData))
-      {
-    	  break;
-      }
-      else
-      {
-        pData++;
-        BytesRemaining--;
-      }
+        if (false == ringbufferPut(UART[uartIndex].TxBufHandle, pData))
+        {
+            break;
+        }
+        else
+        {
+            pData++;
+            BytesRemaining--;
+        }
     }
+    
     /* if the uart is idle, we kick it off by enabling interrupts */
-    if (false == UART[uartIndex].UartBusy)
-    {
-      usart_interrupt_enable(UART[uartIndex].Instance, USART_INT_TBE);
-    }
-    xSemaphoreGive(UART[uartIndex].SendMutex);
-  }
-
+    or_register (base, USART_CTL0, (1 << 7));
+    
   return (Len - BytesRemaining);
 }
 
@@ -448,22 +402,24 @@ static void UartTxData (uint8_t uartIndex)
  * @param    huart : UART handle
  * @return   none
  */
-void UartRxIntCallback (comport_e UartPort)
+void UartRxIntCallback (unsigned long base)
 {
-  /* get the received data */
-  UART[UartPort].RxData = (uint8_t)usart_data_receive(UART[UartPort].Instance);
-
-  /* stuff received data byte into the circular buffer */
-  ringbufferPut(UART[UartPort].RxBufHandle, &UART[UartPort].RxData);
-
-  /* update the stats */
-  UART[UartPort].Error.RxCount++;
-
   /* check error status */
-  UartErrorProcess(UartPort);
+    
+    if (read_register (base, USART_STAT0) & 0xf)
+    {
+        /* An error has occurred */
 
-  /* signal the other task */
-  xSemaphoreGiveFromISR(UART[UartPort].RxSem, NULL);
+        /* Flush any received data which then clears the error flags */
+        
+        read_register (base, USART_DATA);
+        
+    }
+    else
+    {
+        /* stuff received data byte into the circular buffer */
+        ringbufferPut(UART[UartPort].RxBufHandle, read_register (base, USART_DATA));
+    }
 }
 
 
@@ -476,13 +432,10 @@ void UartRxIntCallback (comport_e UartPort)
  * @param    huart : UART index
  * @return   none
  */
-void UartTxIntCallback (comport_e UartPort)
+void UartTxIntCallback (unsigned long base)
 {
-  /* note that the UART is now idle */
-  UART[UartPort].UartBusy = false;
-
   /* Send any data waiting to go */
-  UartTxData(UartPort);
+  UartTxData(base);
 }
 
 
@@ -494,38 +447,17 @@ void UartTxIntCallback (comport_e UartPort)
  * @param    huart : UART handle
  * @return   none
  */
-static void UartErrorProcess (uint8_t uartIndex)
+static void UartErrorProcess (unsigned long base)
 {
-  uint8_t erro_flag = 0;
-  if (SET == usart_flag_get(UART[uartIndex].Instance, USART_FLAG_ORERR))
-  {
-    usart_flag_clear(UART[uartIndex].Instance, USART_FLAG_ORERR);
-    UART[uartIndex].Error.Overrun++;
-    erro_flag++;
-  }
-  if (SET == usart_flag_get(UART[uartIndex].Instance, USART_FLAG_FERR))
-  {
-    usart_flag_clear(UART[uartIndex].Instance, USART_FLAG_FERR);
-    UART[uartIndex].Error.Framing++;
-    erro_flag++;
-  }
-  if (SET == usart_flag_get(UART[uartIndex].Instance, USART_FLAG_PERR))
-  {
-   usart_flag_clear(UART[uartIndex].Instance, USART_FLAG_PERR);
-    UART[uartIndex].Error.Parity++;
-    erro_flag++;
-  }
-  if (SET == usart_flag_get(UART[uartIndex].Instance, USART_FLAG_NERR))
-  {
-    usart_flag_clear(UART[uartIndex].Instance, USART_FLAG_NERR);
-    UART[uartIndex].Error.Parity++;
-    erro_flag++;
-  }
-  /* Re-start reception */
-  if (erro_flag > 0)
-  {
-    usart_interrupt_enable(UART[uartIndex].Instance, USART_INT_RBNE);
-  }
+    if (read_register (base, USART_STAT0) & 0xf)
+    {
+        /* An error has occurred */
+
+        /* Flush any received data which then clears the error flags */
+        
+        read_register (base, USART_DATA);
+        
+    }
 }
 
 
@@ -543,21 +475,6 @@ static void UartErrorProcess (uint8_t uartIndex)
  */
 int UARTConsoleStats (int ArgCount, char **pArguments)
 {
-  /* print title row */
-  ConsolePrintf("Uart  Tx-Count  Rx-Count  Overrun   Framing   Parity\n\r");
-
-  /* print the status data */
-  for (int UartIndex = 0; UartIndex < NO_OF_UARTS; UartIndex++)
-  {
-    ConsolePrintf("%d     %6d    %6d   %6d    %6d   %6d\n\r",
-                  UartIndex,
-                  UART[UartIndex].Error.TxCount,
-                  UART[UartIndex].Error.RxCount,
-                  UART[UartIndex].Error.Overrun,
-                  UART[UartIndex].Error.Framing,
-                  UART[UartIndex].Error.Parity);
-  }
-
   return(CONSOLE_ERROR_OK);
 }
 
@@ -571,16 +488,6 @@ int UARTConsoleStats (int ArgCount, char **pArguments)
  */
 int UARTConsoleClear (int ArgCount, char **pArguments)
 {
-  /* Reset the statistics */
-  for (int UartIndex = 0; UartIndex < NO_OF_UARTS; UartIndex++)
-  {
-    UART[UartIndex].Error.TxCount = 0;
-    UART[UartIndex].Error.RxCount = 0;
-    UART[UartIndex].Error.Overrun = 0;
-    UART[UartIndex].Error.Framing = 0;
-    UART[UartIndex].Error.Parity = 0;
-  }
-
   /* indicate success */
   return (CONSOLE_ERROR_OK);
 }
