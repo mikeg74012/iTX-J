@@ -24,9 +24,8 @@
 
 typedef struct
 {
-  void *pstart;
+  unsigned char *pstart;
   int size;
-  int elementSize;
   int read;
   int write;
   bool available;
@@ -83,7 +82,7 @@ void ringbufferInit (void)
   * @retval index - buffer handle
   *         RINGBUF_ERROR_FULL  - if all buffers are occupied
   */
-int ringbufferCreate (void *pBufStart, int Size, int DataSize)
+int ringbufferCreate (void *pBufStart, int Size)
 {
   int bufferIndex;
   for (bufferIndex = 0; bufferIndex < NO_OF_BUFFERS; bufferIndex++ )
@@ -93,7 +92,6 @@ int ringbufferCreate (void *pBufStart, int Size, int DataSize)
       ringBuffer[bufferIndex].available = false;
       ringBuffer[bufferIndex].pstart = pBufStart;
       ringBuffer[bufferIndex].size = Size;
-      ringBuffer[bufferIndex].elementSize = DataSize;
       ringBuffer[bufferIndex].read = 0;
       ringBuffer[bufferIndex].write = 0;
 
@@ -113,7 +111,6 @@ void ringbufferDestroy (int bufferIndex)
 {
   ringBuffer[bufferIndex].pstart = NULL;
   ringBuffer[bufferIndex].size = 0;
-  ringBuffer[bufferIndex].elementSize = 0;
   ringBuffer[bufferIndex].read = 0;
   ringBuffer[bufferIndex].write = 0;
   ringBuffer[bufferIndex].available = true;
@@ -127,26 +124,24 @@ void ringbufferDestroy (int bufferIndex)
   * @retval true- if successfully written into the buffer
   *         false- if buffer is full
   */
-bool ringbufferPut (int bufferHandle, void *pData)
+bool ringbufferPut (int bufferHandle, uint8_t data)
 {
-  void *pDest;
+    ringBuffer_t *r;
+    
+    r = &ringBuffer[bufferHandle];
+    
+    /* check if there is room in the buffer */
+    if ((r->write + 1) % r->size == r->read)
+    {
+        return false;
+    }
 
-  /* check if there is room in the buffer */
-  if ((ringBuffer[bufferHandle].write + 1) % ringBuffer[bufferHandle].size == ringBuffer[bufferHandle].read)
-  {
-    return false;
-  }
+    r->pstart[r->write] =  data;
 
-  /* calculate destination address */
-  pDest = ringBuffer[bufferHandle].pstart + (ringBuffer[bufferHandle].write * ringBuffer[bufferHandle].elementSize);
+    /* increment the write pointer */
+    r->write = (r->write + 1) % r->size;
 
-  /* copy the new data into the buffer */
-  memcpy(pDest, pData, ringBuffer[bufferHandle].elementSize);
-
-  /* increment the write pointer */
-  ringBuffer[bufferHandle].write = (ringBuffer[bufferHandle].write + 1) % ringBuffer[bufferHandle].size;
-
-  return true;
+    return true;
 }
 
 
@@ -157,21 +152,21 @@ bool ringbufferPut (int bufferHandle, void *pData)
   * @retval true- if data read
   *         false- if buffer empty
   */
-bool ringbufferGet (int bufferHandle, void *pData)
+bool ringbufferGet (int bufferHandle, unsigned char *pData)
 {
-  void *pSource;
-
+    ringBuffer_t *r;
+    
+    r = &ringBuffer[bufferHandle];
+    
   /* check if data is available (buffer not empty) */
-  if (ringBuffer[bufferHandle].read != ringBuffer[bufferHandle].write)
+  if (r->read != r->write)
   {
     /* calculate the source address */
-    pSource = ringBuffer[bufferHandle].pstart + ((ringBuffer[bufferHandle].read * ringBuffer[bufferHandle].elementSize));
-
-    /* copy data from the buffer */
-    memcpy(pData, pSource, ringBuffer[bufferHandle].elementSize);
+    *pData = r->pstart[r->read];
 
     /* increment the read pointer */
-    ringBuffer[bufferHandle].read = (ringBuffer[bufferHandle].read + 1) % ringBuffer[bufferHandle].size;
+    r->read = (r->read + 1) % r->size;
+    
     return (true);
   }
   else

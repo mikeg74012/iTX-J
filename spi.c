@@ -61,7 +61,7 @@ bool SpiInitialise (unsigned long base)
 {
     /* set up the  SPI hardware settings */
 
-    if (base == ACCEL_SPI)
+    if (base == PSRAM_SPI)
     {
         set_gpio_high (SPI_CS_SRAM);
         set_gpio_output (SPI_CS_SRAM);

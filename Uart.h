@@ -27,7 +27,7 @@
  * UART Com Ports available on this chip.  The application layer
  * must use one of these port definitions when initialising the port
  */
-/*
+
 typedef enum
 {
   COM_PORT_0 = 0,
@@ -36,7 +36,7 @@ typedef enum
   COM_PORT_3,
   COM_PORT_4
 } comport_e;
-*/
+
 
 typedef enum
 {
@@ -80,7 +80,6 @@ typedef struct
 } uartconfig_t;
 
 
-
 /*
  **************************************************************************************************
  *                                        GLOBAL VARIABLES
@@ -96,8 +95,8 @@ typedef struct
 stream_t * UARTInitialise    (unsigned long base, uartconfig_t * UartHandle);
 int        UARTConsoleStats  (int ArgCount, char **pArguments);
 int        UARTConsoleClear  (int ArgCount, char **pArguments);
-void       UartRxIntCallback (unsigned long base);
-void       UartTxIntCallback (unsigned long base);
+void       UartRxIntCallback (uint8_t uartIndex);
+void       UartTxIntCallback (uint8_t uartIndex);
 
 
 #endif /* _UART_H_ */

@@ -76,6 +76,8 @@ int main (void)
   /* initialize the watchdog module */
   WatchdogInitialize();
 
+  ms_timer = 0;
+  
   /* initialise the real time clock */
   RtcInit();
 

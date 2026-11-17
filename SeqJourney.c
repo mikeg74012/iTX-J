@@ -157,7 +157,7 @@ typedef struct
  **************************************************************************************************
  */
 static void SeqJourneySequencer     (SjEvent_t event);
-static void SeqJourneyTimerCallback (xTimerHandle timerHandle);
+static void SeqJourneyTimerCallback (TimerHandle_t *timerHandle);
 static void SeqJourneyStartGNSS     (void);
 static void SeqJourneyStopGNSS      (void);
 static void SeqJourneyCreateTripId  (void);
@@ -194,7 +194,7 @@ static void SeqInstantSendIEM       (void);
  **************************************************************************************************
  */
 /* Timer used to trigger "in-journey" events such as requesting GNSS data and sending DJM messages to cloud */
-static TimerHandle_t  SjTimer;
+static TimerHandle_t  *SjTimer;
 
 /* The current state of this sequencer */
 static eSeqJourneyState CurrentState = SJS_IDLE;
@@ -315,7 +315,7 @@ void SeqJourneyInit (void)
   {
     FirstCall = false;
     /* Create timer to trigger in-journey events such as getting GNSS data and sending Device Journey messages */
-    SjTimer = xTimerCreate("SjTimer", SJ_TIMER_PERIOD_MS, pdTRUE, (void *)NULL, SeqJourneyTimerCallback);
+    SjTimer = xTimerCreate(SJ_TIMER_PERIOD_MS, SeqJourneyTimerCallback);
 
     /* set the initial state */
     CurrentState = SJS_IDLE;
@@ -957,7 +957,7 @@ static bool SeqQualifyForRadioScan(SeqJourneyTrip_t* currentTrip)
  * @Warning   We cannot call the sequencer directly from here (the timer interrupt)
  *            instead we must queue a message for the modem task
  */
-static void SeqJourneyTimerCallback (xTimerHandle timerHandle)
+static void SeqJourneyTimerCallback (TimerHandle_t *timerHandle)
 {
   CurrentTrip.JourneyTime++;
   CurrentTrip.SecondsSinceLastDjm++;

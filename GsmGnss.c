@@ -868,7 +868,7 @@ static bool GsmGnssPowerOn (void)
   {
     /* GNSS is in stand alone power control mode. reset GNSS power control pin to power it off */
     TRACE_GNSS("GNSS power is enabled now \n\r");
-    GpioWritePin(GNSS_POWER_ENABLE_PORT, GNSS_POWER_ENABLE_PIN, IO_PIN_SET);  /* GNSS power off */
+    set_gpio_high (GNSS_POWER_EN);      /* GNSS power off */
     sleep(100);
     AtResult = AT_COMPLETE;
   }
@@ -904,7 +904,7 @@ static bool GsmGnssPowerOff (void)
   {
     /* GNSS is in stand alone power control mode. reset GNSS power control pin to power it off */
     TRACE_GNSS("GNSS power pin is disabled now \n\r");
-    GpioWritePin(GNSS_POWER_ENABLE_PORT, GNSS_POWER_ENABLE_PIN, IO_PIN_RESET);  /* GNSS power pin reset off */
+    set_gpio_low (GNSS_POWER_EN);           /* GNSS power pin reset off */
     AtResult = AT_COMPLETE;
   }
   else

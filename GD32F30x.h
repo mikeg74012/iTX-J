@@ -387,7 +387,9 @@
 void     set_gpio_low       (unsigned char val);
 void     set_gpio_high      (unsigned char val);
 void     set_gpio_output    (unsigned char val);
+void     set_gpio_enable_pullup(unsigned char val);
 void     set_gpio_enable_pulldown(unsigned char val);
+void     set_gpio_disable_pullup(unsigned char val);
 void     set_gpio_open_drain(unsigned char val);
 void     set_gpio_analog    (unsigned char val);
 void     set_gpio_input     (unsigned char val);

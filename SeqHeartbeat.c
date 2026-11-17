@@ -137,7 +137,7 @@ static void SeqHeartbeatStartTimer    (void);
 static void SeqHeartbeatStopTimer     (void);
 static void SeqHeartbeatSendSms       (void);
 static void SeqHeartbeatSendSmsOK     (void);
-static void SeqHeartbeatTimerCallback (xTimerHandle timerHandle);
+static void SeqHeartbeatTimerCallback (TimerHandle_t *timerHandle);
 
 
 /*
@@ -146,7 +146,7 @@ static void SeqHeartbeatTimerCallback (xTimerHandle timerHandle);
  **************************************************************************************************
  */
 /* Timer used to trigger timed "heartbeat" events such making sure the modem is powered up long enough to receive SMS */
-static TimerHandle_t  ShTimer;
+static TimerHandle_t  *ShTimer;
 
 /* Counter to keep track of time since the modem was powered on */
 static uint32_t SecondsSincePowerOn = 0;
@@ -238,7 +238,7 @@ void SeqHeartbeatInit (void)
     FirstCall = false;
 
     /* Create timer used to make sure modem is powered long enough to receive SMS */
-    ShTimer = xTimerCreate("ShTimer", SH_TIMER_PERIOD_MS, pdTRUE, (void *)NULL, SeqHeartbeatTimerCallback);
+    ShTimer = xTimerCreate(SH_TIMER_PERIOD_MS, SeqHeartbeatTimerCallback);
 
     /* set the initial state */
     CurrentState = SHS_IDLE;
@@ -687,7 +687,7 @@ static void SeqHeartbeatComplete (void)
  * @Warning   We cannot call the sequencer directly from here (the timer interrupt)
  *            instead we must queue a message for the modem task
  */
-static void SeqHeartbeatTimerCallback (xTimerHandle timerHandle)
+static void SeqHeartbeatTimerCallback (TimerHandle_t *timerHandle)
 {
   SecondsSincePowerOn++;
 

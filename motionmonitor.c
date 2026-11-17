@@ -62,6 +62,8 @@
 
 #define DC_FILTER_LENGTH              10
 
+volatile unsigned char mm_timer = 0;
+
 typedef enum MM_MessageId
 {
   IMPACT_DATA_FINISHED = 0,
@@ -87,8 +89,7 @@ typedef struct MM_Message
 /* store for latest IMU samples, which are used for event detection */
 ImuData_t DetectBuffer[MM_DETECT_BUFFER_ELEMENTS] = { 0 };
 
-static TimerHandle_t mmTimer;
-static SemaphoreHandle_t timerSemaphore;
+static TimerHandle_t *mmTimer;
 
 //static AccelerationData_t accelDataOffset = {0};
 static eMmState motionMonitorState;
@@ -131,7 +132,7 @@ static uint32_t LastDhmTime = 0;
  *                                       PRIVATE PROTOTYPES
  **************************************************************************************************
  */
-static void     MmTimerCallback             (xTimerHandle timer);
+static void     MmTimerCallback             (TimerHandle_t *timer);
 static void     DetectEvents                (uint16_t noOfSamples);
 static bool     MotionMonitorHandleDHM      (void);
 static void     StateTransitionCheck        (void);
@@ -163,16 +164,10 @@ void MotionMonitorTask (void const *argument)
   motionMonitorState = WAKEUP_POWERUP;
   WakeupCount = MM_WAKEUP_POWERON_TIMEOUT;
 
-  timerSemaphore = xSemaphoreCreateBinary();
-
   MotionBufferResetBuffer();  /*reset IMU buffer */
 
-  mmTimer = xTimerCreate("MotionMonitorTimer", MM_TIMER_PERIOD_MS, pdTRUE, (void*) NULL, MmTimerCallback);
-  if (mmTimer == NULL)
-  {
-    TRACE_IMU("MM Timer not created\n\r");
-  }
-
+  mmTimer = xTimerCreate(MM_TIMER_PERIOD_MS, MmTimerCallback);
+  
   /* Initialise Accelerometer */
   AccelDriverInit();
 
@@ -191,7 +186,7 @@ void MotionMonitorTask (void const *argument)
     sleep(3);  /* to remove the FIFO Status Error */
     if (motionMonitorState == WAKEUP_RTC)
     {
-      xSemaphoreGive(timerSemaphore);  /* not wait for the cycle */
+//      xSemaphoreGive(timerSemaphore);  /* not wait for the cycle */
     }
   }
   else
@@ -211,174 +206,172 @@ void MotionMonitorTask (void const *argument)
     SystemFreeWatchDogReload();
 
     /* Only proceed if the timer has fired.*/
-    if (pdTRUE == xSemaphoreTake(timerSemaphore, portMAX_DELAY))
+    
+    if ((ms_timer - last_mm_timer) < MM_TIMER_PERIOD_MS)
     {
-      WatchdogSetActive(MOTIONMONITORTASK);
+        sleep(1);
+        
+        continue;
+    }
+    
+  WatchdogSetActive(MOTIONMONITORTASK);
 
-      /*
-       * Read from the accelerometer
-       * See how many samples are available to read in the FIFO
-       * TODO - this section is too implementation specific.  The motion monitor should NOT know / care about the accelerometer implementation!!
+  /*
+   * Read from the accelerometer
+   * See how many samples are available to read in the FIFO
+   * TODO - this section is too implementation specific.  The motion monitor should NOT know / care about the accelerometer implementation!!
+   */
+  uint16_t SamplesAvailable;
+  if (!AccelDriverGetFifoStatus(&SamplesAvailable))
+  {
+    /* Error getting FIFO status - reset the FIFO */
+    AccelDriverResetFifo();
+    SamplesAvailable = 0;
+    ConsolePrintf("***FIFO STATUS ERROR ****\n\r");
+  }
+
+  /*
+   * Samples Available is expressed in terms of 16-bit words available -
+   * this will be the number of bytes we get from each of the FIFO
+   * registers (one low bytes, the other high bytes).
+   */
+  /* Limit the number of samples to be read in one go. */
+  if (SamplesAvailable > MAX_FIFO_READ_SAMPLES)
+  {
+    SamplesAvailable = MAX_FIFO_READ_SAMPLES;
+  }
+
+  /*
+   * The number of samples must be divisible by 6 (i.e. multiples of
+   * Gx Gy Gz XLx XLy XLz). That always appears to be the case, but
+   * we must make sure as otherwise we might lose track of whereabouts
+   * in the datastream we are.
+   */
+  SamplesAvailable = (SamplesAvailable / 6) * 6;
+
+  // For most of our calculations we need to know how many sets of XYZPRT we have, not individual samples
+  uint16_t SamplesRead = SamplesAvailable / 6;
+  //TRACE_IMU("SA= %d\n\r", SamplesRead);
+
+  //XyzGetFilteredData(&accelDataOffset);
+
+  while (SamplesAvailable > 0)
+  {
+    ImuData_t ImuData;
+
+    AccelDriverGetFifoDataPair(&ImuData.gyro.X);
+    AccelDriverGetFifoDataPair(&ImuData.gyro.Y);
+    AccelDriverGetFifoDataPair(&ImuData.gyro.Z);
+
+    AccelDriverGetFifoDataPair(&ImuData.accel.X);
+    AccelDriverGetFifoDataPair(&ImuData.accel.Y);
+    AccelDriverGetFifoDataPair(&ImuData.accel.Z);
+
+    //TODO It would be better to read from the accelDriver in mG to begin with!  We should not know about the specific accelerometer raw output format here.
+    uint32_t intermediateValue = ((int32_t)ImuData.accel.X) * 1000;
+    ImuData.accel.X = (int16_t)(intermediateValue / 2048);
+
+    intermediateValue = ((int32_t)ImuData.accel.Y) * 1000;
+    ImuData.accel.Y = (int16_t)(intermediateValue / 2048);
+
+    intermediateValue = ((int32_t)ImuData.accel.Z) * 1000;
+    ImuData.accel.Z = (int16_t)(intermediateValue / 2048);
+
+    /* If we are in Fake Mini-Event mode, overwrite with fake data here */
+    if (FakeMiniEvent)
+    {
+      /* Each time we fake a mini-event make the X value of the accel data very slightly
+       * bigger, this helps us to identify the mini-event during debug.
        */
-      uint16_t SamplesAvailable;
-      if (!AccelDriverGetFifoStatus(&SamplesAvailable))
+      static uint16_t increment = 0;
+      /* Replace real IMU data with fake data */
+      ImuData.accel.X = 2500 + increment;
+      ImuData.accel.Y = 2000;
+      ImuData.accel.Z = 2000;
+      FakeMiniEvent--;
+      if (FakeMiniEvent == 0)
       {
-        /* Error getting FIFO status - reset the FIFO */
-        AccelDriverResetFifo();
-        SamplesAvailable = 0;
-        ConsolePrintf("***FIFO STATUS ERROR ****\n\r");
-      }
-
-      /*
-       * Samples Available is expressed in terms of 16-bit words available -
-       * this will be the number of bytes we get from each of the FIFO
-       * registers (one low bytes, the other high bytes).
-       */
-      /* Limit the number of samples to be read in one go. */
-      if (SamplesAvailable > MAX_FIFO_READ_SAMPLES)
-      {
-        SamplesAvailable = MAX_FIFO_READ_SAMPLES;
-      }
-
-      /*
-       * The number of samples must be divisible by 6 (i.e. multiples of
-       * Gx Gy Gz XLx XLy XLz). That always appears to be the case, but
-       * we must make sure as otherwise we might lose track of whereabouts
-       * in the datastream we are.
-       */
-      SamplesAvailable = (SamplesAvailable / 6) * 6;
-
-      // For most of our calculations we need to know how many sets of XYZPRT we have, not individual samples
-      uint16_t SamplesRead = SamplesAvailable / 6;
-      //TRACE_IMU("SA= %d\n\r", SamplesRead);
-
-      //XyzGetFilteredData(&accelDataOffset);
-
-      while (SamplesAvailable > 0)
-      {
-        ImuData_t ImuData;
-
-        AccelDriverGetFifoDataPair(&ImuData.gyro.X);
-        AccelDriverGetFifoDataPair(&ImuData.gyro.Y);
-        AccelDriverGetFifoDataPair(&ImuData.gyro.Z);
-
-        AccelDriverGetFifoDataPair(&ImuData.accel.X);
-        AccelDriverGetFifoDataPair(&ImuData.accel.Y);
-        AccelDriverGetFifoDataPair(&ImuData.accel.Z);
-
-        //TODO It would be better to read from the accelDriver in mG to begin with!  We should not know about the specific accelerometer raw output format here.
-        uint32_t intermediateValue = ((int32_t)ImuData.accel.X) * 1000;
-        ImuData.accel.X = (int16_t)(intermediateValue / 2048);
-
-        intermediateValue = ((int32_t)ImuData.accel.Y) * 1000;
-        ImuData.accel.Y = (int16_t)(intermediateValue / 2048);
-
-        intermediateValue = ((int32_t)ImuData.accel.Z) * 1000;
-        ImuData.accel.Z = (int16_t)(intermediateValue / 2048);
-
-        /* If we are in Fake Mini-Event mode, overwrite with fake data here */
-        if (FakeMiniEvent)
-        {
-          /* Each time we fake a mini-event make the X value of the accel data very slightly
-           * bigger, this helps us to identify the mini-event during debug.
-           */
-          static uint16_t increment = 0;
-          /* Replace real IMU data with fake data */
-          ImuData.accel.X = 2500 + increment;
-          ImuData.accel.Y = 2000;
-          ImuData.accel.Z = 2000;
-          FakeMiniEvent--;
-          if (FakeMiniEvent == 0)
-          {
-            /* Last data replacement for this mini-event. Increase the increment
-             * for the next one.
-             */
-            increment++;
-          }
-        }
-
-        /* Raw Data needed for Factory Test */
-        memcpy(&RawData, &ImuData, sizeof(ImuData));
-
-        /* ITS-077 packets report absolute XYZ values that are not affected by the XYZ normalization setting. 
-         * Therefore, IMU data should be passed to the filter before normalization.
+        /* Last data replacement for this mini-event. Increase the increment
+         * for the next one.
          */
-        XyzFilterAddToFifoMean(&ImuData.accel);
+        increment++;
+      }
+    }
 
-        /* Fitment Process */
-        if (IsFitmentNormalizationOn() || (IsMountCheckActive()))
-        {  /* matrix rotation and mount position process start */
+    /* Raw Data needed for Factory Test */
+    memcpy(&RawData, &ImuData, sizeof(ImuData));
 
-          int pitch, roll;
-          CalculateOrientation((float)ImuData.accel.X, (float)ImuData.accel.Y, (float)ImuData.accel.Z, &pitch, &roll);
+    /* ITS-077 packets report absolute XYZ values that are not affected by the XYZ normalization setting. 
+     * Therefore, IMU data should be passed to the filter before normalization.
+     */
+    XyzFilterAddToFifoMean(&ImuData.accel);
 
-          /* Update the Mount Survey with IMU Data*/
-          FitmentMountSurveyUpdate((const ImuData_t*) &ImuData, pitch, roll);
+    /* Fitment Process */
+    if (IsFitmentNormalizationOn() || (IsMountCheckActive()))
+    {  /* matrix rotation and mount position process start */
 
-          /* Apply Fitment Matrix to the IMU Data */
-          /* !! IMU Data will be altered !!*/
-          FitmentApplyRotationToIMU(&ImuData, pitch, roll);  
-        }
-        /*
-         * Subtract XYZ offsets to zero out the "DC" effect of gravity, and
-         * give us acceleration data that is referenced to zero in each axis
-         */
+      int pitch, roll;
+      CalculateOrientation((float)ImuData.accel.X, (float)ImuData.accel.Y, (float)ImuData.accel.Z, &pitch, &roll);
+
+      /* Update the Mount Survey with IMU Data*/
+      FitmentMountSurveyUpdate((const ImuData_t*) &ImuData, pitch, roll);
+
+      /* Apply Fitment Matrix to the IMU Data */
+      /* !! IMU Data will be altered !!*/
+      FitmentApplyRotationToIMU(&ImuData, pitch, roll);  
+    }
+    /*
+     * Subtract XYZ offsets to zero out the "DC" effect of gravity, and
+     * give us acceleration data that is referenced to zero in each axis
+     */
 //        ImuData.accel.X -= accelDataOffset.X;
 //        ImuData.accel.Y -= accelDataOffset.Y;
 //        ImuData.accel.Z -= accelDataOffset.Z;
 
-        if (streamXYZ)
-        {
-          TRACE_IMU("XYZ= %4d, %4d, %4d  GYRO= %4d, %4d, %4d \n\r", ImuData.accel.X, ImuData.accel.Y, ImuData.accel.Z,
-                      ImuData.gyro.X, ImuData.gyro.Y, ImuData.gyro.Z);
-        }
-
-        MotionBufferWriteSingle(&ImuData);
-
-        SamplesAvailable -= 6;
-      }
-
-      XyzFilterAddFifoMeanIntoFilter();
-
-      /*
-       * See if there were any events in the Accelerometer data we have just read.
-       * Note: We do not respond to events in factory test mode
-       */
-      if (!TestModeGet())
-      {
-        DetectEvents(SamplesRead);
-      }
-
-      /* If the RTC woke us up it may be time to send a heartbeat and instant Event */
-      if (WAKEUP_RTC == motionMonitorState)
-      {
-        MotionMonitorProcessDHMAndInstantEvents();
-      }
-
-      /* Notify Button Module for the time elapsed of key hold */
-      ButtonMonitorHoldCountInc();
-
-      /*
-       * See if we should change state.
-       */
-      StateTransitionCheck();
-    }
-
-    if (hibernateRequested)
+    if (streamXYZ)
     {
-      hibernateRequested = false;
+      TRACE_IMU("XYZ= %4d, %4d, %4d  GYRO= %4d, %4d, %4d \n\r", ImuData.accel.X, ImuData.accel.Y, ImuData.accel.Z,
+                  ImuData.gyro.X, ImuData.gyro.Y, ImuData.gyro.Z);
+    }
 
-      /* Hibernate the MCU - will only return if USB power present */
-      PowerStartHibernation();
-    }
-    /* debug print */
-#ifdef DEBUG
-    if (WakeupCount > 0)
-    {
-      TRACE_IMU("Wake up in MM SC=%d  W-Cause=%d Wake_CN=%d\n\r",  GetSleepCount(),  motionMonitorState, WakeupCount);
-    }
-#endif
+    MotionBufferWriteSingle(&ImuData);
+
+    SamplesAvailable -= 6;
   }
+
+  XyzFilterAddFifoMeanIntoFilter();
+
+  /*
+   * See if there were any events in the Accelerometer data we have just read.
+   * Note: We do not respond to events in factory test mode
+   */
+  if (!TestModeGet())
+  {
+    DetectEvents(SamplesRead);
+  }
+
+  /* If the RTC woke us up it may be time to send a heartbeat and instant Event */
+  if (WAKEUP_RTC == motionMonitorState)
+  {
+    MotionMonitorProcessDHMAndInstantEvents();
+  }
+
+  /* Notify Button Module for the time elapsed of key hold */
+  ButtonMonitorHoldCountInc();
+
+  /*
+   * See if we should change state.
+   */
+  StateTransitionCheck();
+}
+
+if (hibernateRequested)
+{
+  hibernateRequested = false;
+
+  /* Hibernate the MCU - will only return if USB power present */
+  PowerStartHibernation();
+}
 }
 
 
@@ -552,11 +545,11 @@ uint16_t GetHPFilerBufferSize(void)
  * @param     Timer Handle
  * @return    None
  */
-static void MmTimerCallback (xTimerHandle timer)
+static void MmTimerCallback (TimerHandle_t *timer)
 {
   if (timer == mmTimer)
   {
-    xSemaphoreGiveFromISR(timerSemaphore, NULL);
+    mm_timer = 1;
     MountSurveyFlagCheck();  /* set mount checking when wake up */
   }
 }
@@ -963,7 +956,7 @@ static void GoToSleep (void)
   sleep(100);  /* for bus to stable to avoid FIFO error */
   if (motionMonitorState == WAKEUP_RTC)
   {
-    xSemaphoreGive(timerSemaphore);  /* not wait for the cycle */
+//    xSemaphoreGive(timerSemaphore);  /* not wait for the cycle */
   }
 }
 
@@ -1007,7 +1000,7 @@ static eMmState GetStandByWakeupCause (void)
   }
   else if ((bool)(GetLPSleepStatus() & RTC_BKUP_USB_CABLE_FLAG) != usb_cable_state)
   {
-    (usb_cable_state == IO_PIN_SET)? TRACE_IMU("Wake-up (USB ON)\n\r"): TRACE_IMU("Wake-up (USB OFF)\n\r");
+//    (usb_cable_state == IO_PIN_SET)? TRACE_IMU("Wake-up (USB ON)\n\r"): TRACE_IMU("Wake-up (USB OFF)\n\r");
     WakeupCount = MM_WAKEUP_USB_TIMEOUT;
     WakeupCause = WAKEUP_USB;
   }

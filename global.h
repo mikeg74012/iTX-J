@@ -75,6 +75,8 @@
 #include "uart.h"
 #include "lowpowersupport.h"
 #include "fitment.h"
+#include "ringbuffer.h"
+#include "xtimer.h"
 
 
 

@@ -51,7 +51,6 @@
  *                                    PRIVATE MEMBER VARIABLES
  **************************************************************************************************
  */
-static spihandle_t SerialRamSpiHandle;
 
 
 /*
@@ -74,14 +73,11 @@ static bool              SerialRamTest          (void);
  * @param     ChipSelect: the chip select to use
  * @return    none
  */
-void SerialRamInit (spibus_e SpiBus, spichipselect_t ChipSelect)
+void SerialRamInit (void)
 {
   /* Configure the SPI bus & chip select for this device */
-  SerialRamSpiHandle.Bus = SpiBus;
-  SerialRamSpiHandle.ChipSelect = ChipSelect;
-  SerialRamSpiHandle.Mode = SERIAL_RAM_SPI_MODE;
-  SerialRamSpiHandle.BitRate = SERIAL_RAM_SPI_BITRATE;
-  SpiInitialise(&SerialRamSpiHandle);
+//  SerialRamSpiHandle.BitRate = SERIAL_RAM_SPI_BITRATE;
+  SpiInitialise(PSRAM_SPI);
 
 #if SERIAL_RAM_TYPE==SERIAL_RAM_MICROCHIP
   /* Set the mode to sequential reads / writes */
@@ -114,8 +110,7 @@ bool SerialRamRead (uint32_t address, uint8_t *pBuffer, int size)
     writeBuffer[3] = ((address >> 0) & 0xFF);
 
     /* make the transfer */
-    SerialRamSpiHandle.TransferType = SPI_TRANSFER_TXRX;
-    retval = SpiTransfer(&SerialRamSpiHandle, writeBuffer, 4, pBuffer, size);
+    retval = SpiTransfer(PSRAM_SPI, writeBuffer, 4, pBuffer, size, SPI_TRANSFER_TXRX);
   }
   return (retval);
 }
@@ -141,8 +136,7 @@ bool SerialRamWrite (uint32_t address, uint8_t *pBuffer, int size)
     writeBuffer[3] = ((address >> 0) & 0xFF);
 
     /* make the transfer */
-    SerialRamSpiHandle.TransferType = SPI_TRANSFER_TXTX;
-    retval = SpiTransfer(&SerialRamSpiHandle, writeBuffer, 4, pBuffer, size);
+    retval = SpiTransfer(PSRAM_SPI, writeBuffer, 4, pBuffer, size, SPI_TRANSFER_TXTX);
   }
   return (retval);
 }
@@ -182,8 +176,7 @@ static bool SerialRamSetMode (uint8_t mode)
   writeBuffer[1] = mode;
 
   /* make the transfer */
-  SerialRamSpiHandle.TransferType = SPI_TRANSFER_TX;
-  retval = SpiTransfer(&SerialRamSpiHandle, writeBuffer, 2, NULL, 0);
+  retval = SpiTransfer(PSRAM_SPI, writeBuffer, 2, NULL, 0, SPI_TRANSFER_TX);
   return (retval);
 }
 

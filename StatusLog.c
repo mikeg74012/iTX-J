@@ -43,9 +43,6 @@ EventRecord_t InstantEventRecord[MAX_RECORD_EVENTS];
 /* Number of events currently stored */
 static int  LogEventCount = 0;
 
-/* Semaphore used to block calling tasks to make Status Log atomic */
-static SemaphoreHandle_t  statusLogInProcessMutex;
-
 
 
 /*
@@ -76,8 +73,6 @@ static  void        StatusLogInstantEventRecordDataReset (void);
 void StatusLogInitialize (void)
 {
   /* Set up mutex to ensure sequential access to statusLog */
-  statusLogInProcessMutex = xSemaphoreCreateBinary();
-  xSemaphoreGive(statusLogInProcessMutex);
 
   if (IsLowPowerSleepFlagUp())
   {
@@ -101,7 +96,7 @@ bool StatusLogWriteEventCode (uint8_t eventCode, uint32_t data)
 {
   uint32_t TimeStamp = RtcGetTimeStamp();
 
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
 
     /* find the first free entry in the log */
@@ -133,11 +128,9 @@ bool StatusLogWriteEventCode (uint8_t eventCode, uint32_t data)
           /* Counting Event only, update the payload */
           IncrStatusLogPayloadCounter(LogIndex);
         }
-        xSemaphoreGive(statusLogInProcessMutex);
         return true;
       }
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
   return false;
 }
@@ -151,7 +144,7 @@ bool StatusLogWriteEventCode (uint8_t eventCode, uint32_t data)
  */
 bool StatusLogReadEvent (StatusLog_t * pEvent, bool delete)
 {
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+    if (1)
   {
     /* find the first used entry in the log */
     for (int LogIndex = 0; LogIndex < MAX_LOG_EVENTS; LogIndex++)
@@ -167,11 +160,9 @@ bool StatusLogReadEvent (StatusLog_t * pEvent, bool delete)
             LogEventCount--;
           }
         }
-        xSemaphoreGive(statusLogInProcessMutex);
         return true;
       }
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
   return false;
 }
@@ -330,7 +321,7 @@ bool StatusLogInstantEventMatureCheck (void)
   int deltaTS = 0;
   bool haveEventMatured = false;
 
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
     /* check the record need to send */
     for (int recIndex = 0; recIndex < MAX_RECORD_EVENTS; recIndex++)
@@ -348,7 +339,6 @@ bool StatusLogInstantEventMatureCheck (void)
         }
       }
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
   if (haveEventMatured)
   {
@@ -373,7 +363,7 @@ static void  StatusLogDataReset (void)
 {
   LogEventCount = 0;
 
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
     /* invalidate all log entries */
     for (int LogIndex = 0; LogIndex < MAX_LOG_EVENTS; LogIndex++)
@@ -385,7 +375,6 @@ static void  StatusLogDataReset (void)
       StatusLog[LogIndex].EventData2 = 0;
       StatusLog[LogIndex].EventData3 = 0;
     }
-    xSemaphoreGive(statusLogInProcessMutex);
     /*  record reset */
     StatusLogInstantEventRecordDataReset();
   }
@@ -399,7 +388,7 @@ static void  StatusLogDataReset (void)
  */
 static void  StatusLogInstantEventRecordDataReset (void)
 {
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
     for (int recIndex = 0; recIndex < MAX_RECORD_EVENTS; recIndex++)
     {
@@ -407,7 +396,6 @@ static void  StatusLogInstantEventRecordDataReset (void)
       InstantEventRecord[recIndex].eventID = 0;
       InstantEventRecord[recIndex].eventCount = 0;
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
 }
 
@@ -420,7 +408,7 @@ static void  StatusLogInstantEventRecordDataReset (void)
 static bool WriteEventLogToSpiRAM (void)
 {
   bool success = false;
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
     uint32_t startAddress = SERIAL_RAM_EVEVT_LOG_AREA_START;
 
@@ -444,7 +432,6 @@ static bool WriteEventLogToSpiRAM (void)
     {
       ConsolePrintf("Failed backup EventLog data to SPI RAM\r\n");
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
   return (success);
 }
@@ -458,7 +445,7 @@ static bool WriteEventLogToSpiRAM (void)
 static bool ReadEventLogFromSpiRAM (void)
 {
   bool success = false;
-  if (pdTRUE == xSemaphoreTake(statusLogInProcessMutex, portMAX_DELAY))
+  if (1)
   {
      uint32_t startAddress = SERIAL_RAM_EVEVT_LOG_AREA_START;
 
@@ -476,7 +463,6 @@ static bool ReadEventLogFromSpiRAM (void)
     {
       ConsolePrintf("Failed read back EventLog data from SPI RAM\r\n");
     }
-    xSemaphoreGive(statusLogInProcessMutex);
   }
   return (success);
 }

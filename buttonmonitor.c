@@ -32,7 +32,6 @@
  *                                    PRIVATE MEMBER VARIABLES
  **************************************************************************************************
  */
-static SemaphoreHandle_t buttonPress;
 static bool ButtonDown = false;
 static uint32_t ButtonHoldCount = 0;
 
@@ -59,51 +58,48 @@ void ButtonMonitorTask (void const * argument)
   uint32_t tick0= 0;
   ButtonMonitorInitButton();
 
-  buttonPress = xSemaphoreCreateBinary();
-
+  
   /* Infinite loop */
   for (;;)
   {
     WatchdogSetWaiting(BUTTONMONITORTASK);
-    if(pdTRUE == xSemaphoreTake(buttonPress,portMAX_DELAY))
-    {
-      WatchdogSetActive(BUTTONMONITORTASK);
+    
+    WatchdogSetActive(BUTTONMONITORTASK);
 
-      /* now check the button state */
-      if (false == ButtonDown)
-      {
+    /* now check the button state */
+    if (false == ButtonDown)
+    {
         if (!read_gpio (USER_BUTTON))
         {
-          sleep(BUTTON_DEBOUNCE_MS);  /* allow some de-bounce time */
-          if (!read_gpio (USER_BUTTON))
-          {
-            ButtonDown = true;
-            TRACE_("BUTTON", "Button Down\n\r");
-            tick0 = csGetTick();
-            SequencerButtonDown();
-          }
+            sleep(BUTTON_DEBOUNCE_MS);  /* allow some de-bounce time */
+            
+            if (!read_gpio (USER_BUTTON))
+            {
+                ButtonDown = true;
+                TRACE_("BUTTON", "Button Down\n\r");
+                tick0 = csGetTick();
+                SequencerButtonDown();
+            }
         }
-      }
-      else
-      {
+    }
+    else
+    {
         if (read_gpio(USER_BUTTON))
         {
-          sleep(BUTTON_DEBOUNCE_MS);  /* allow some de-bounce time */
-          if (read_gpio(USER_BUTTON))
-          {
-            TRACE_("BUTTON", "Button Up\n\r");
-
-            ButtonHoldCount = 0;
-
-            if ((csGetTick() - tick0) >= (BUTTON_PRESS_DELAY_MS - (2 * BUTTON_DEBOUNCE_MS)))
+            sleep(BUTTON_DEBOUNCE_MS);  /* allow some de-bounce time */
+            
+            if (read_gpio(USER_BUTTON))
             {
-              TRACE_("BUTTON", "Button was down longer than 1 s, Fire MSG\n\r");
-              SequencerButtonPress();
+                ButtonHoldCount = 0;
+
+                if ((csGetTick() - tick0) >= (BUTTON_PRESS_DELAY_MS - (2 * BUTTON_DEBOUNCE_MS)))
+                {
+                    SequencerButtonPress();
+                }
+                
+                ButtonDown = false;
             }
-            ButtonDown = false;
-          }
         }
-      }
     }
   }
 }
@@ -124,6 +120,7 @@ static void ButtonMonitorInitButton (void)
   
   set_gpio_input (USER_BUTTON);
   
+#if 0
   /* interrupt init */
   InterruptConfig.irqPrePriority = 5;
   InterruptConfig.irqSubPriority = 0;
@@ -132,6 +129,7 @@ static void ButtonMonitorInitButton (void)
 
   /* Enable the interrupt */
   GpioEnableInterrupt(RED_BUTTON_PORT, RED_BUTTON_PIN);
+#endif
 }
 
 
@@ -142,7 +140,6 @@ static void ButtonMonitorInitButton (void)
  */
 void ButtonMonitorPressCallback (void)
 {
-  xSemaphoreGiveFromISR(buttonPress, NULL);
 }
 
 

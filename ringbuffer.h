@@ -33,10 +33,10 @@
  **************************************************************************************************
  */
 void ringbufferInit          (void);
-int  ringbufferCreate        (void *pBufStart, int Size, int DataSize);
+int  ringbufferCreate        (void *pBufStart, int Size);
 void ringbufferDestroy       (int bufferIndex);
-bool ringbufferPut           (int bufferHandle, void *pdata);
-bool ringbufferGet           (int bufferHandle, void *pData);
+bool ringbufferPut           (int bufferHandle, uint8_t data);
+bool ringbufferGet           (int bufferHandle, uint8_t *pData);
 bool ringbufferDataAvailable (int bufferHandle);
 
 

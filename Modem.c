@@ -925,10 +925,15 @@ static void ModemProcessMessage (ModemMessage_t message)
 static bool ModemPWRkeyControl (bool powerUp)
 {
   /* toggle the modem PowerKey pin to start the modem */
-  GpioWritePin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, IO_PIN_SET);
+    
+    set_gpio_high (GSM_POWERKEY);
+    
   (powerUp)? sleep(GSM_POWER_ON_DELAY) :sleep(GSM_POWER_OFF_DELAY);
-  GpioWritePin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, IO_PIN_RESET);
+  
+    set_gpio_low (GSM_POWERKEY);
+  
   sleep(MODEM_BOOT_TIME_MS);
+  
   return (powerUp);
 }
 
@@ -1002,9 +1007,11 @@ static bool ModemPowerOn (void)
   ModemGSMPowerControl(true);
 
  /* toggle the modem PowerKey pin to start the modem */
-  GpioWritePin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, IO_PIN_SET);
+  
+  set_gpio_high (GSM_POWERKEY);
   sleep(GSM_POWER_ON_DELAY);
-  GpioWritePin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, IO_PIN_RESET);
+  
+  set_gpio_low (GSM_POWERKEY);
   sleep(MODEM_BOOT_TIME_MS);
 
   /* enable Modem comms so we can capture the output */
@@ -1084,12 +1091,13 @@ static void ModemGSMPowerControl (bool PowerEnable)
     /* turn on power to the modem, or GSM if GNSS was controlled in stand alone mode */
     if (ModemEnablePositive)
     {
-     GpioWritePin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, IO_PIN_SET);
+        set_gpio_high (GSM_POWER_EN);
     }
     else
     {
-     GpioWritePin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, IO_PIN_RESET);
+        set_gpio_low (GSM_POWER_EN);
     }
+    
     sleep(10);
   }
   else
@@ -1097,11 +1105,11 @@ static void ModemGSMPowerControl (bool PowerEnable)
     /* turn off power to the modem, or GSM if GNSS was controlled in stand alone mode */
     if (ModemEnablePositive)
     {
-     GpioWritePin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, IO_PIN_RESET);
+        set_gpio_low (GSM_POWER_EN);
     }
     else
     {
-     GpioWritePin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, IO_PIN_SET);
+        set_gpio_high (GSM_POWER_EN);
     }
   }
 }
@@ -1143,7 +1151,7 @@ static bool ModemHandlePowerDown (void)
     /* turn off power supply to the GNSS section now */
     if (modemSupportStandAlone)
     {
-      GpioWritePin(GNSS_POWER_ENABLE_PORT, GNSS_POWER_ENABLE_PIN, IO_PIN_RESET);  /* GNSS power off */
+         set_gpio_low (GNSS_POWER_EN);
     }
 
     /* turn off power supply to the GSM section */
@@ -2333,12 +2341,7 @@ static void ModemUpdateIMEI (void)
  */
 static void ModemGpioInit (void)
 {
-  gpioconfig_t PinConfig;
-
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, &PinConfig);
+  set_gpio_input (GSM_POWER_EN);
 
   /*
    * Detect whether the Modem enable pin uses negative logic (HW issue A) or
@@ -2346,7 +2349,7 @@ static void ModemGpioInit (void)
    * We detect by reading the un-driven state of the pin to see whether it is
    * pulled up or down.
    */
-  if (IO_PIN_RESET == GpioReadPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN))
+  if (0 == read_gpio(GSM_POWER_EN))
   {
     ModemEnablePositive = true;
     TRACE_MODEM("Modem enable positive (HW issue B+)\n\r");
@@ -2358,29 +2361,30 @@ static void ModemGpioInit (void)
   }
 
   /* Configure GPIO output pins : GSM_POWER_ENABLE_PIN, GSM_POWERKEY_PIN & DTR_TO_MODEM_PIN */
-  PinConfig.Direction = IO_OUTPUT_PP;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, &PinConfig);
-  GpioInitPin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, &PinConfig);
-  GpioInitPin(DTR_TO_MODEM_PORT, DTR_TO_MODEM_PIN, &PinConfig);
-  GpioInitPin(GNSS_POWER_ENABLE_PORT, GNSS_POWER_ENABLE_PIN, &PinConfig);
+  
+  set_gpio_low (GSM_POWER_EN);
+  set_gpio_output (GSM_POWER_EN);
+  set_gpio_low (GSM_POWERKEY);
+  set_gpio_output (GSM_POWERKEY);
+  set_gpio_low (DTR_TO_MODEM);
+  set_gpio_output (DTR_TO_MODEM);
+  set_gpio_low (GNSS_POWER_EN);
+  set_gpio_output (GNSS_POWER_EN);
+  
   if (modemSupportStandAlone)
   {
-    GpioWritePin(GNSS_POWER_ENABLE_PORT, GNSS_POWER_ENABLE_PIN, IO_PIN_RESET);  /* GNSS power off */
+      set_gpio_low (GNSS_POWER_EN);     /* GNSS power off */
   }
 
   /* Configure GPIO input pins : RI_FROM_MODEM_Pin DCD_FROM_MODEM_Pin */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(RI_FROM_MODEM_PORT, RI_FROM_MODEM_PIN, &PinConfig);
-  GpioInitPin(DCD_FROM_MODEM_PORT, DCD_FROM_MODEM_PIN, &PinConfig);
-
+  
+  set_gpio_input (RI_FROM_MODEM);
+  set_gpio_input (DCD_FROM_MODEM);
+  
   /* Configure GPIO pin power on level */
   ModemGSMPowerControl(false);   /* modem,gsm off */
 
-  GpioWritePin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN, IO_PIN_RESET);  /* PWRKEY pull high */
+  set_gpio_low (GSM_POWERKEY);
 }
 
 
@@ -2391,11 +2395,11 @@ static void ModemGpioInit (void)
  */
 static void ModemGpioDeInit (void)
 {
-  GpioDeInitPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN);
-  GpioDeInitPin(GSM_POWERKEY_PORT, GSM_POWERKEY_PIN);
-  GpioDeInitPin(DTR_TO_MODEM_PORT, DTR_TO_MODEM_PIN);
-  GpioDeInitPin(RI_FROM_MODEM_PORT, RI_FROM_MODEM_PIN);
-  GpioDeInitPin(DCD_FROM_MODEM_PORT, DCD_FROM_MODEM_PIN);
+    set_gpio_input (GSM_POWER_EN);
+    set_gpio_input (GSM_POWERKEY);
+    set_gpio_input (DTR_TO_MODEM);
+    set_gpio_input (RI_FROM_MODEM);
+    set_gpio_input (DCD_FROM_MODEM);
 }
 
 

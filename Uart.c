@@ -40,12 +40,10 @@ typedef struct
 
 
 /* UART definition */
-#if 0
+#if 1
 typedef struct
 {
   uint32_t             Instance;                     /* USART/UART port register */
-  uint8_t              IRQn;                         /* USART/UART IRQ number */
-  rcu_periph_enum      RcuClock;                     /* RCU clock reference for the uart */
   uint8_t              RxBuf[cUARTRxBufferSize];     /* actual buffer storage, never accessed directly */
   uint8_t              TxBuf[cUARTTxBufferSize];
   uint8_t              RxBufHandle;                  /* buffer handles for external buffer module */
@@ -54,12 +52,11 @@ typedef struct
   uint8_t              RxData;                       /* The data byte currently being received */
   bool                 UartBusy;
   uarterror_t          Error;
-  SemaphoreHandle_t    RxSem;
-  SemaphoreHandle_t    SendMutex;                    /* makes sure Send and SentBuffer complete atomically */
   stream_t             Stream;
 } uart_t;
 #endif
 
+static uart_t UART[NO_OF_UARTS];
 
 /*
  **************************************************************************************************
@@ -119,6 +116,8 @@ static bool     UartPut4            (uint8_t Data)                   {  return(U
  */
 stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
 {
+    int UartIndex;
+    
   /* Initialise the circular buffer module and create Tx and Rx buffers for this uart */
 //  UART[UartIndex].RxBufHandle = ringbufferCreate(&UART[UartIndex].RxBuf, cUARTRxBufferSize, 1);
 //  UART[UartIndex].TxBufHandle = ringbufferCreate(&UART[UartIndex].TxBuf, cUARTTxBufferSize, 1);
@@ -151,6 +150,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
     set_gpio_input (RXD_FROM_MODEM);
     set_gpio_alternate (TXD_TO_MODEM);
     
+    UartIndex = 0;
+    
     break;
   case USART1:
 /*
@@ -171,6 +172,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
     set_gpio_input (RX_FROM_WIFI);
     set_gpio_alternate (TX_TO_WIFI);
 
+    UartIndex = 1;
+    
     break;
 
 
@@ -193,6 +196,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
     set_gpio_input (DEBUG_RX);
     set_gpio_alternate (DEBUG_TX);
 
+    UartIndex = 3;
+    
     break;
     
   case USART4:
@@ -213,8 +218,14 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
     
     set_gpio_input (GNSS_TX);
     
+    UartIndex = 4;
+    
     break;
   }
+
+    UART[UartIndex].RxBufHandle = ringbufferCreate(&UART[UartIndex].RxBuf, cUARTRxBufferSize);
+    UART[UartIndex].TxBufHandle = ringbufferCreate(&UART[UartIndex].TxBuf, cUARTTxBufferSize);
+    UART[UartIndex].Instance = base;
 
   /* Initialise the UART hardware */
   
@@ -263,8 +274,12 @@ static uint8_t UartGet (uint8_t uartIndex)
   uint8_t Result;
 
   /* yield until serial data is available */
-  xSemaphoreTake(UART[uartIndex].RxSem, portMAX_DELAY);
-
+  
+  while (!ringbufferDataAvailable (UART[uartIndex].RxBufHandle))
+  {
+      sleep(0);
+  }
+  
   /* return the data */
   ringbufferGet(UART[uartIndex].RxBufHandle, &Result);
   return (Result);
@@ -280,7 +295,7 @@ static uint8_t UartGet (uint8_t uartIndex)
  * @return      bool  : true  = Success
  *                      false = Failure - the tx queue is full
  */
-static bool UartSendString (unsigned long base, uint8_t *pData)
+static bool UartSendString (uint8_t uartIndex, uint8_t *pData)
 {
   bool ret = true;
 
@@ -288,7 +303,7 @@ static bool UartSendString (unsigned long base, uint8_t *pData)
 
     while (*pData != 0)
     {
-      if (false == ringbufferPut(UART[uartIndex].TxBufHandle, pData))
+      if (false == ringbufferPut(UART[uartIndex].TxBufHandle, *pData))
       {
         ret = false;
       }
@@ -297,7 +312,7 @@ static bool UartSendString (unsigned long base, uint8_t *pData)
 
     /* if the uart is idle, we kick it off by enabling interrupts */
 
-    or_register (base, USART_CTL0, (1 << 7));
+    or_register (UART[uartIndex].Instance, USART_CTL0, (1 << 7));
     
   return (ret);
 }
@@ -312,14 +327,14 @@ static bool UartSendString (unsigned long base, uint8_t *pData)
  * @paran[in]   Len      : the number of bytes to send
  * @return      uint32_t : the number of bytes actually sent (will be less then Len if buffer full)
  */
-static uint32_t UartSendBuffer (unsigned long base, uint8_t *pData, uint32_t Len)
+static uint32_t UartSendBuffer (uint8_t uartIndex, uint8_t *pData, uint32_t Len)
 {
   uint32_t BytesRemaining = Len;
 
   /* add all the data to the transmit buffer. */
     while (BytesRemaining > 0)
     {
-        if (false == ringbufferPut(UART[uartIndex].TxBufHandle, pData))
+        if (false == ringbufferPut(UART[uartIndex].TxBufHandle, *pData))
         {
             break;
         }
@@ -331,7 +346,7 @@ static uint32_t UartSendBuffer (unsigned long base, uint8_t *pData, uint32_t Len
     }
     
     /* if the uart is idle, we kick it off by enabling interrupts */
-    or_register (base, USART_CTL0, (1 << 7));
+    or_register (UART[uartIndex].Instance, USART_CTL0, (1 << 7));
     
   return (Len - BytesRemaining);
 }
@@ -350,7 +365,7 @@ static uint32_t UartSendBuffer (unsigned long base, uint8_t *pData, uint32_t Len
 static bool UartPut (uint8_t uartIndex, uint8_t Data)
 {
   /* if the buffer is full an error has occurred */
-  if (false == ringbufferPut(UART[uartIndex].TxBufHandle, &Data)) return false;
+  if (false == ringbufferPut(UART[uartIndex].TxBufHandle, Data)) return false;
 
   /* if the uart is idle, we kick it off by enabling interrupts */
   if (false == UART[uartIndex].UartBusy)
@@ -375,22 +390,25 @@ static bool UartPut (uint8_t uartIndex, uint8_t Data)
  */
 static void UartTxData (uint8_t uartIndex)
 {
+    uart_t *u;
+    unsigned char data;
+    
+    u = &UART[uartIndex];
+    
   /* Is data ready to transmit? */
-  if (ringbufferGet(UART[uartIndex].TxBufHandle, &UART[uartIndex].TxData))
+  if (ringbufferGet(u->TxBufHandle, &data))
   {
     /* note that the uart is now busy */
-    UART[uartIndex].UartBusy = true;
+    u->UartBusy = true;
 
     /* transmit the next byte */
-    usart_data_transmit(UART[uartIndex].Instance, UART[uartIndex].TxData);      /* send the next data byte */
+    usart_data_transmit(u->Instance, data);      /* send the next data byte */
 
-    /* update the stats */
-    UART[uartIndex].Error.TxCount++;
   }
   else
   {
     /* Disable interrupts if there is nothing else to send */
-    usart_interrupt_disable(UART[uartIndex].Instance, USART_INT_TBE);
+    usart_interrupt_disable(u->Instance, USART_INT_TBE);
   }
 }
 
@@ -402,23 +420,27 @@ static void UartTxData (uint8_t uartIndex)
  * @param    huart : UART handle
  * @return   none
  */
-void UartRxIntCallback (unsigned long base)
+void UartRxIntCallback (uint8_t uartIndex)
 {
+    uart_t *u;
+    
+    u = &UART[uartIndex];
+    
   /* check error status */
     
-    if (read_register (base, USART_STAT0) & 0xf)
+    if (read_register (u->Instance, USART_STAT0) & 0xf)
     {
         /* An error has occurred */
 
         /* Flush any received data which then clears the error flags */
         
-        read_register (base, USART_DATA);
+        read_register (u->Instance, USART_DATA);
         
     }
     else
     {
         /* stuff received data byte into the circular buffer */
-        ringbufferPut(UART[UartPort].RxBufHandle, read_register (base, USART_DATA));
+        ringbufferPut(u->RxBufHandle, read_register (u->Instance, USART_DATA));
     }
 }
 
@@ -432,10 +454,10 @@ void UartRxIntCallback (unsigned long base)
  * @param    huart : UART index
  * @return   none
  */
-void UartTxIntCallback (unsigned long base)
+void UartTxIntCallback (uint8_t uartIndex)
 {
   /* Send any data waiting to go */
-  UartTxData(base);
+  UartTxData(uartIndex);
 }
 
 

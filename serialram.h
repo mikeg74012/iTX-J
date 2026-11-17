@@ -32,7 +32,7 @@
  **************************************************************************************************
  */
 /* API */
-void  SerialRamInit   (spibus_e SpiBus, spichipselect_t ChipSelect);
+void  SerialRamInit   (void);
 bool  SerialRamRead   (uint32_t address, uint8_t *pBuffer, int size);
 bool  SerialRamWrite  (uint32_t address, uint8_t *pBuffer, int size);
 bool  SerialRamWUST   (void);

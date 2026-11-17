@@ -20,7 +20,7 @@
  *                                        PRIVATE DEFINES
  **************************************************************************************************
  */
-#define USER_BUT_DETECT_DELAY             (200)     /* Delay value for the wakup pulse detection with user Button */
+#define USER_BUT_DETECT_DELAY             (100)     /* Delay value for the wakup pulse detection with user Button */
 
 /*
  **************************************************************************************************
@@ -88,28 +88,29 @@ void HardwareVersionCheck (void)
  */
 bool isPCBVersionF (void)
 {
-  bool rtnFlag = true;
-  gpioconfig_t PinConfig;
+    bool rtnFlag = true;
 
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_UP;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DF_PORT, HWBOARD_VERSION_DF_PIN, &PinConfig);
+    set_gpio_input (BOARD_VER_DETECT);
+    set_gpio_enable_pullup (BOARD_VER_DETECT);
 
+    /* Do it again to waste a bit of time while the signal changes */
+    
+    set_gpio_enable_pullup (BOARD_VER_DETECT);
+  
+    
   /* Check if HW able to keep GNSS on when GSM off */
-  if (GpioReadPin(HWBOARD_VERSION_DF_PORT, HWBOARD_VERSION_DF_PIN) == IO_PIN_RESET)
-  {
-    rtnFlag = true;
-  }
-  else
-  {
-    rtnFlag = false;
-  }
+    if (read_gpio (BOARD_VER_DETECT) == 0)
+    {
+        rtnFlag = true;
+    }
+    else
+    {
+        rtnFlag = false;
+    }
   /* Reset the pull-up of the IO */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DF_PORT, HWBOARD_VERSION_DF_PIN, &PinConfig);
+    
+    set_gpio_disable_pullup (BOARD_VER_DETECT);
+
   return (rtnFlag);
 }
 
@@ -123,29 +124,29 @@ bool isPCBVersionF (void)
 bool isPCBVersionDE (void)
 {
   bool rtnFlag = true;
-  gpioconfig_t PinConfig;
   int i = 0;
+
   /* input pin */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_UP;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DDE_PORT, HWBOARD_VERSION_DDE_PIN, &PinConfig);
+  
+  set_gpio_input (DDE_PIN);
+  set_gpio_enable_pullup (DDE_PIN);
+  
   /* output pin*/
-  PinConfig.Direction = IO_OUTPUT_PP;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_USER_BUT_PORT, HWBOARD_VERSION_USER_BUT_PIN, &PinConfig);
+  
+  set_gpio_low (USER_BUTTON);
+  set_gpio_output (USER_BUTTON);
+  
   /* set to low */
-  GpioWritePin(HWBOARD_VERSION_USER_BUT_PORT, HWBOARD_VERSION_USER_BUT_PIN, IO_PIN_SET);
-  GpioWritePin(HWBOARD_VERSION_USER_BUT_PORT, HWBOARD_VERSION_USER_BUT_PIN, IO_PIN_RESET);
+  set_gpio_high (USER_BUTTON);
+  set_gpio_low (USER_BUTTON);
+  
   /* wait 100 us*/
-  do
-  {
-    GpioReadPin(HWBOARD_VERSION_DDE_PORT, HWBOARD_VERSION_DDE_PIN);
-    i++;
-  } while (i < USER_BUT_DETECT_DELAY);
+  
+  delay_us (USER_BUT_DETECT_DELAY);
+  
   /* check the pin */
-  if (GpioReadPin(HWBOARD_VERSION_DDE_PORT, HWBOARD_VERSION_DDE_PIN) == IO_PIN_RESET)
+
+  if (read_gpio (DDE_PIN) == 0)
   {
     rtnFlag = true;
   }
@@ -154,11 +155,11 @@ bool isPCBVersionDE (void)
     rtnFlag = false;
   }
   /* Reset the IOs */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DDE_PORT, HWBOARD_VERSION_DDE_PIN, &PinConfig);
-  GpioInitPin(HWBOARD_VERSION_USER_BUT_PORT, HWBOARD_VERSION_USER_BUT_PIN, &PinConfig);
+  
+  set_gpio_input (DDE_PIN);
+  set_gpio_disable_pullup (DDE_PIN);
+  set_gpio_input (USER_BUTTON);
+  
   return (rtnFlag);
 }
 
@@ -172,17 +173,19 @@ bool isPCBVersionDE (void)
 bool isPCBVersionD2 (void)
 {
   bool rtnFlag = true;
-  gpioconfig_t PinConfig;
+  
   /* input pin pull down first */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_DOWN;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DD2_PORT, HWBOARD_VERSION_DD2_PIN, &PinConfig);
+  
+  set_gpio_input (CHRGR_PSEL);
+  //set_gpio_enable_pulldown (CHRGR_PSEL);
+  
   /* input pin pull up for detection */
-  PinConfig.Pull = IO_PULL_UP;
-  GpioInitPin(HWBOARD_VERSION_DD2_PORT, HWBOARD_VERSION_DD2_PIN, &PinConfig);
+  
+  set_gpio_enable_pullup (CHRGR_PSEL);
+  
   /* HW D2, no 47k pull down on this pin, it will show HIGH state */
-  if (GpioReadPin(HWBOARD_VERSION_DD2_PORT, HWBOARD_VERSION_DD2_PIN) == IO_PIN_SET)
+  
+  if (read_gpio (CHRGR_PSEL) != 0)
   {
     rtnFlag = true;
   }
@@ -190,11 +193,11 @@ bool isPCBVersionD2 (void)
   {
     rtnFlag = false;
   }
+
+  
   /* Reset the IOs */
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(HWBOARD_VERSION_DD2_PORT, HWBOARD_VERSION_DD2_PIN, &PinConfig);
+  set_gpio_disable_pullup (CHRGR_PSEL);
+
   return (rtnFlag);
 }
 
@@ -208,20 +211,16 @@ bool isPCBVersionD2 (void)
 bool isPCBVersionA (void)
 {
   bool rtnFlag = true;
-  gpioconfig_t PinConfig;
 
-  PinConfig.Direction = IO_INPUT_DIGITAL;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN, &PinConfig);
-
+  set_gpio_input (GSM_POWER_EN);
+  
   /*
    * Detect whether the Modem enable pin uses negative logic (HW issue A) or
    * positive logic (HW issue B+).
    * We detect by reading the un-driven state of the pin to see whether it is
    * pulled up or down.
    */
-  if (GpioReadPin(GSM_POWER_ENABLE_PORT, GSM_POWER_ENABLE_PIN) == IO_PIN_SET)
+  if (read_gpio (GSM_POWER_EN) != 0)
   {
     rtnFlag = true;
   }

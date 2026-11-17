@@ -38,9 +38,6 @@ typedef struct
   /* Instance of the I2C Port */
   uint32_t          Instance;
 
-  /* each bus is locked while transfers are in progress */
-  SemaphoreHandle_t BusMutex;
-
   /* flag to indicate whether the bus has been initialised */
   bool              Initialized;
 } i2c_bus_t;
@@ -94,8 +91,6 @@ bool I2cInitialise (i2cbus_e I2cBus, uint32_t BitRate)
   /* Initialise this specific bus */
   if (false == pBus->Initialized)
   {
-    pBus->BusMutex = xSemaphoreCreateBinary();
-    xSemaphoreGive(pBus->BusMutex);
 
     /* Configure up the I2C instance for this bus */
     switch (I2cBus)
@@ -132,8 +127,8 @@ bool I2cInitialise (i2cbus_e I2cBus, uint32_t BitRate)
 
     if (pBus->Instance)
     {
-      rcu_periph_clock_enable(RCU_AF);
-
+        or_register (RCU, RCU_APB2EN, (1 << 0));
+      
       /* configure I2C clock */
       i2c_clock_config(pBus->Instance, BitRate, I2C_DTCY_2);
 
@@ -166,9 +161,6 @@ bool I2cDeInitialise (i2cbus_e I2cBus)
   /* deinit the I2C Bus instance */
   i2c_deinit(pBus->Instance);
 
-  /* delete the semaphores */
-  vSemaphoreDelete(pBus->BusMutex);
-
   /* Reset the driver parameters */
   pBus->Initialized = false;
   pBus->Instance = 0;
@@ -193,16 +185,8 @@ bool I2cTransmit (i2cbus_e I2cBus, uint8_t ChipAddress, uint8_t * pTxData, uint1
 
   if (pBus->Initialized && pBus->Instance)
   {
-    /* Lock the I2C bus */
-    Status = (pdTRUE == xSemaphoreTake(pBus->BusMutex, portMAX_DELAY));
+    I2cWriteBytes(pBus->Instance, ChipAddress, pTxData, Size);
 
-    if (Status)
-    {
-      I2cWriteBytes(pBus->Instance, ChipAddress, pTxData, Size);
-
-      /* Unlock the I2C bus */
-      xSemaphoreGive(pBus->BusMutex);
-    }
   }
 
   return Status;
@@ -225,16 +209,8 @@ bool I2cReceive (i2cbus_e I2cBus, uint8_t ChipAddress, uint8_t * pRxData, uint16
 
   if (pBus->Initialized && pBus->Instance)
   {
-    /* Lock the I2C bus */
-    Status = (pdTRUE == xSemaphoreTake(pBus->BusMutex, portMAX_DELAY));
-
-    if (Status)
-    {
       I2cReadBytes(pBus->Instance, ChipAddress, pRxData, Size);
 
-      /* Unlock the I2C bus */
-      xSemaphoreGive(pBus->BusMutex);
-    }
   }
   return Status;
 }
@@ -259,11 +235,7 @@ bool I2c_read_GG_bytes (i2cbus_e I2cBus, uint8_t bus_address, uint8_t* p_buffer,
 
   if (pBus->Initialized && pBus->Instance)
   {
-    /* Lock the I2C bus */
     uint32_t I2Cn = pBus->Instance;
-    Status = (pdTRUE == xSemaphoreTake(pBus->BusMutex, portMAX_DELAY));
-    if (Status)
-    {
       /* i2c read begin */
 
       /* wait until I2C bus is idle */
@@ -336,11 +308,7 @@ bool I2c_read_GG_bytes (i2cbus_e I2cBus, uint8_t bus_address, uint8_t* p_buffer,
       i2c_ack_config(I2Cn,I2C_ACK_ENABLE);
       i2c_ackpos_config(I2Cn,I2C_ACKPOS_CURRENT);
       /* i2c read end */
-
-     /* Unlock the I2C bus */
-      xSemaphoreGive(pBus->BusMutex);
-    }
-  }
+ }
 
   return (Status);
 }

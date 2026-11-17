@@ -50,8 +50,8 @@
  **************************************************************************************************
  */
 
-TimerHandle_t    LedTimer               = NULL;
-TimerHandle_t    LedTestTimer           = NULL;
+TimerHandle_t    *LedTimer               = NULL;
+TimerHandle_t    *LedTestTimer           = NULL;
 static bool      m_statusLedInit        = false;
 static bool      LedFlashState          = false;
 static int       FlashCount             = 0;
@@ -72,8 +72,8 @@ static int        StartUpFlashTicks       = 40;
  **************************************************************************************************
  */
 static void LedInitialise    (void);
-static void LedTimerCallback (xTimerHandle LedTimer);
-static void LedTestTimerCallback (xTimerHandle timer);
+static void LedTimerCallback (TimerHandle_t *LedTimer);
+static void LedTestTimerCallback (TimerHandle_t *timer);
 static void LedOnLL          (LedColor_e color);
 static void LedOffLL         (LedColor_e color);
 static void LedFlash         (LedColor_e colour, uint32_t LedOnTicks, uint32_t LedRepeatTicks );
@@ -100,7 +100,7 @@ void LedInit (void)
     LedInitialise();
 
     /* Create a software Timer for LED */
-    LedTimer = xTimerCreate("LedFlashTimer", LED_TIMER_TICK_PERIOD_MS, pdTRUE, (void *)NULL, LedTimerCallback);
+    LedTimer = xTimerCreate(LED_TIMER_TICK_PERIOD_MS, LedTimerCallback);
     m_statusLedInit = true;
     if (IsLowPowerSleepFlagUp())
     {
@@ -206,13 +206,11 @@ void LedSleep (void)
  */
 static void LedInitialise (void)
 {
-  gpioconfig_t PinConfig;
-
-  PinConfig.Direction = IO_OUTPUT_PP;
-  PinConfig.Pull = IO_PULL_NONE;
-  PinConfig.InterruptType = IO_INT_NONE;
-  GpioInitPin(GREEN_LED_PORT, GREEN_LED_PIN, &PinConfig);
-  GpioInitPin(RED_LED_PORT, RED_LED_PIN, &PinConfig);
+    set_gpio_low (USER_LED_GREEN);
+    set_gpio_output (USER_LED_GREEN);
+    set_gpio_low (USER_LED_RED);
+    set_gpio_output (USER_LED_RED);
+    
 }
 
 
@@ -249,20 +247,11 @@ static void LedTest (void)
   if (NULL == LedTestTimer)
   {
     /* Create the test timer if not created before */
-    LedTestTimer = xTimerCreate("LedTestTimer", LED_TIMER_TEST_PERIOD_MS, pdTRUE, (void *)NULL, LedTestTimerCallback);
+    LedTestTimer = xTimerCreate(LED_TIMER_TEST_PERIOD_MS, LedTestTimerCallback);
     FlashTestCount = 0;
 
-    if (!LedTestTimer)
-    {
-      TRACE_("SYSTEM", "FaiLed to Create LED Test Timer\n\r");
-      return;
-    }
-
     /* Kick off the Timer */
-    if (xTimerStart(LedTestTimer, 0) != pdPASS)
-    {
-      TRACE_("SYSTEM", "FaiLed to Start LED Test Timer\n\r");
-    }
+    xTimerStart(LedTestTimer, 0);
   }
   else
   {
@@ -280,16 +269,16 @@ static void LedOnLL (LedColor_e color)
   switch (color)
   {
     case RED:
-      GpioWritePin(RED_LED_PORT, RED_LED_PIN, IO_PIN_SET);
-      GpioWritePin(GREEN_LED_PORT, GREEN_LED_PIN, IO_PIN_RESET);
+        set_gpio_high (USER_LED_RED);
+        set_gpio_low (USER_LED_GREEN);
       break;
     case GREEN:
-      GpioWritePin(RED_LED_PORT, RED_LED_PIN, IO_PIN_RESET);
-      GpioWritePin(GREEN_LED_PORT, GREEN_LED_PIN, IO_PIN_SET);
+        set_gpio_low (USER_LED_RED);
+        set_gpio_high (USER_LED_GREEN);
       break;
     case AMBER:
-      GpioWritePin(RED_LED_PORT, RED_LED_PIN, IO_PIN_SET);
-      GpioWritePin(GREEN_LED_PORT, GREEN_LED_PIN, IO_PIN_SET);
+        set_gpio_high (USER_LED_RED);
+        set_gpio_high (USER_LED_GREEN);
       break;
     default:
       break;
@@ -307,14 +296,14 @@ static void LedOffLL (LedColor_e color)
   switch (color)
   {
     case RED:
-      GpioWritePin(RED_LED_PORT, RED_LED_PIN, IO_PIN_RESET);
+        set_gpio_low (USER_LED_RED);
       break;
     case GREEN:
-      GpioWritePin(GREEN_LED_PORT, GREEN_LED_PIN, IO_PIN_RESET);
+        set_gpio_low (USER_LED_GREEN);
       break;
     case AMBER:
-      GpioWritePin(RED_LED_PORT, RED_LED_PIN, IO_PIN_RESET);
-      GpioWritePin(GREEN_LED_PORT, GREEN_LED_PIN, IO_PIN_RESET);
+        set_gpio_low (USER_LED_GREEN);
+        set_gpio_low (USER_LED_RED);
       break;
     default:
       break;
@@ -345,10 +334,8 @@ static void LedFlash (LedColor_e colour, uint32_t LedOnTicks, uint32_t LedRepeat
     LedOnLL(FlashColour);
 
     /* Start the timer to begin flashing */
-    if ( xTimerChangePeriod( LedTimer, LED_TIMER_TICK_PERIOD_MS, 100 ) != pdPASS )
-    {
-      TRACE_("SYSTEM", "FaiLed to Start LED Timer\n\r");
-    }
+    xTimerChangePeriod( LedTimer, LED_TIMER_TICK_PERIOD_MS, 100 );
+    
   }
 }
 
@@ -375,7 +362,7 @@ static void LedStopFlash (void)
   * @param   LedTimer - Timer Handle
   * @retval  None
   */
-static void LedTimerCallback (xTimerHandle LedTimer)
+static void LedTimerCallback (TimerHandle_t *LedTimer)
 {
   FlashCount++;
 
@@ -403,7 +390,7 @@ static void LedTimerCallback (xTimerHandle LedTimer)
   * @param   timer - Timer Handle
   * @retval  None
   */
-static void LedTestTimerCallback (xTimerHandle timer)
+static void LedTestTimerCallback (TimerHandle_t *timer)
 {
   static bool LedOn = false;
   static bool greenLedFlashing = true; // Start with green LED flashing

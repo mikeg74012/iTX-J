@@ -787,23 +787,12 @@ static bool ConfigWriteFlash (configData_t * pWriteBuffer, int sizeInBytes)
    * We cannot have another task writing or reading the flash until this function completes
    * so we enter a critical section here.  This stops schedule AND interrupts
    */
-  if (taskSCHEDULER_NOT_STARTED != xTaskGetSchedulerState())
-  {
-    taskENTER_CRITICAL();
-  }
 
   /* Erase the FLASH page to be re-written */
   ConfigErasePage();
 
   /* Write the new config store to FLASH */
   FlashWrite(ConfigPageAddrs, (uint8_t *) pWriteBuffer, sizeInBytes);
-
-
-  /* Resume interrupts and scheduler */
-  if (taskSCHEDULER_NOT_STARTED != xTaskGetSchedulerState())
-  {
-    taskEXIT_CRITICAL();
-  }
 
   return retval;
 }

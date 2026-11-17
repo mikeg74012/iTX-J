@@ -3120,6 +3120,9 @@
         <name>$PROJ_DIR$\wifi.c</name>
     </file>
     <file>
+        <name>$PROJ_DIR$\xtimer.c</name>
+    </file>
+    <file>
         <name>$PROJ_DIR$\xyzfilter.c</name>
     </file>
 </project>

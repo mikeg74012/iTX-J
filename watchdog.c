@@ -57,7 +57,7 @@ typedef struct WdTask
  **************************************************************************************************
  */
 /* Timer handle */
-static TimerHandle_t WatchdogTimer;
+static TimerHandle_t *WatchdogTimer;
 
 /* Watchdog state for each individual RTOS task */
 static WatchdogTask_t WatchdogTask[WatchDogTaskIDMAX];
@@ -68,7 +68,7 @@ static WatchdogTask_t WatchdogTask[WatchDogTaskIDMAX];
  *                                       PRIVATE PROTOTYPES
  **************************************************************************************************
  */
-static void WatchDogTimerCallback  (xTimerHandle timer);
+static void WatchDogTimerCallback  (TimerHandle_t *timer);
 
 
 /**
@@ -103,11 +103,8 @@ void WatchdogInitialize (void)
 void WatchdogStart (void)
 {
   /* create a timer to keep tabs on the individual RTOS tasks */
-  WatchdogTimer = xTimerCreate("WatchDogMonitorTimer", WATCHDOG_KICK_PERIOD_MS, pdTRUE, (void*) NULL, WatchDogTimerCallback);
-  if (WatchdogTimer == NULL)
-  {
-    TRACE_WATCHDOG("ERROR: WatchDog Timer not created\n\r");
-  }
+  WatchdogTimer = xTimerCreate(WATCHDOG_KICK_PERIOD_MS, WatchDogTimerCallback);
+
   xTimerStart(WatchdogTimer, portMAX_DELAY);
 }
 
@@ -158,7 +155,7 @@ void WatchdogSetActive (eWatchDogTaskID_t watchDogTaskID)
  * @param     xTimerHandle timer
  * @return    None
  */
-void WatchDogTimerCallback (xTimerHandle timer)
+void WatchDogTimerCallback (TimerHandle_t *timer)
 {
   bool WatchdogTimeout = false;
 

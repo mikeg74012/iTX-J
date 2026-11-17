@@ -76,30 +76,32 @@ bool FlashInit (void)
  */
 bool FlashErase (uint32_t PageAddress, uint32_t NoOfPages)
 {
-  fmc_state_enum FmcState = FMC_READY;
+  unsigned char state = 1;
   
   /* Unlock flash */
   fmc_unlock();
 
   /* Clear any pending flags */
-  fmc_flag_clear(FMC_FLAG_BANK0_END);
-  fmc_flag_clear(FMC_FLAG_BANK0_WPERR);
-  fmc_flag_clear(FMC_FLAG_BANK0_PGERR);
+  
+  write_register (FMC, FMC_STAT0, (1 << 5) | (1 << 4) | (1 << 2));
 
   /* erase the flash pages */
   for (int PageCounter = 0; PageCounter < NoOfPages; PageCounter++)
   {
-    FmcState = fmc_page_erase(PageAddress + (FLASH_PAGE_SIZE * PageCounter));
-    fmc_flag_clear(FMC_FLAG_BANK0_END);
-    fmc_flag_clear(FMC_FLAG_BANK0_WPERR);
-    fmc_flag_clear(FMC_FLAG_BANK0_PGERR);
-	if (FMC_READY != FmcState) break;
+    state = fmc_page_erase(PageAddress + (FLASH_PAGE_SIZE * PageCounter));
+    
+    write_register (FMC, FMC_STAT0, (1 << 5) | (1 << 4) | (1 << 2));
+    
+	if (state != 1) 
+    {
+        break;
+    }
   }
 
   /* Lock flash */
   fmc_lock();
 
-  return (FMC_READY == FmcState);
+  return (state == 1);
 }
 
 
@@ -168,30 +170,27 @@ bool FlashProgram (uint32_t ProgramType, uint32_t Address, uint64_t Data)
   uint32_t address = Address;
   uint32_t data0   = 0;
   
-  fmc_state_enum FmcStatus = FMC_READY;
+  unsigned char state = 1;
   
   if (ProgramType == FLASH_TYPEPROGRAM_HALFWORD)
   {
     /* program flash, a half word */
     data0 = Data & 0xffff;
-    FmcStatus = fmc_halfword_program(address, data0);
-    if (FMC_READY == FmcStatus)
+    state = fmc_halfword_program(address, data0);
+    if (1 == state)
     {
-      fmc_flag_clear(FMC_FLAG_BANK0_END);
-      fmc_flag_clear(FMC_FLAG_BANK0_WPERR);
-      fmc_flag_clear(FMC_FLAG_BANK0_PGERR);
+        write_register (FMC, FMC_STAT0, (1 << 5) | (1 << 4) | (1 << 2));
     }
   }
   else if (ProgramType == FLASH_TYPEPROGRAM_WORD)
   {
     /* program flash, a word */
     data0 = Data & 0xffffffff;
-    FmcStatus = fmc_word_program(address, data0);
-    fmc_flag_clear(FMC_FLAG_BANK0_END);
-    fmc_flag_clear(FMC_FLAG_BANK0_WPERR);
-    fmc_flag_clear(FMC_FLAG_BANK0_PGERR);
+    state = fmc_word_program(address, data0);
+    
+        write_register (FMC, FMC_STAT0, (1 << 5) | (1 << 4) | (1 << 2));
   }
-  return (FMC_READY == FmcStatus);
+  return (1 == state);
 }
 
 

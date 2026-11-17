@@ -14,6 +14,7 @@
 
 
 
+#define DDE_PIN             defpin(PTA,0)
 #define USB_CC2             defpin(PTA,1)
 #define TX_TO_WIFI          defpin(PTA,2)
 #define RX_FROM_WIFI        defpin(PTA,3)
