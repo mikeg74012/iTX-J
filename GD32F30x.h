@@ -13,13 +13,31 @@
 #ifndef GD32F30x_H_
 #define GD32F30x_H_
 
-#define     AHB1_SPEED          8000000
-#define     AHB2_SPEED          8000000
-#define     APB1_SPEED          8000000
-#define     APB2_SPEED          8000000
+#define     AHB1_SPEED          48000000
+#define     AHB2_SPEED          48000000
+#define     APB1_SPEED          24000000
+#define     APB2_SPEED          48000000
 
 
 #define     DBG                 0xe0042000
+
+
+#define I2C0                0x40005400
+#define I2C1                0x40005800
+
+#define I2C_CTL0            0x0000
+#define I2C_CTL1            0x0004
+#define I2C_SADDR0          0x0008
+#define I2C_SADDR1          0x000c
+#define I2C_DATA            0x0010
+#define I2C_STAT0           0x0014
+#define I2C_STAT1           0x0018
+#define I2C_CKCFG           0x001c
+#define I2C_RT              0x0020
+#define I2C_FMPCFG          0x0090
+
+
+
 
 #define SPI0                0x40013000
 #define SPI1                0x40003800

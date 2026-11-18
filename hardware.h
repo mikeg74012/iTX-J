@@ -47,8 +47,8 @@
 #define SPI1_SCK            defpin(PTB,13)
 #define SPI_CS_SRAM         defpin(PTB,12)
 #define USER_BUTTON         defpin(PTB,11)
-#define I2C1_SDA            defpin(PTB,9)
-#define I2C1_SCL            defpin(PTB,8)
+#define I2C0_SDA            defpin(PTB,9)
+#define I2C0_SCL            defpin(PTB,8)
 #define IMU_INT2            defpin(PTB,7)
 #define SPI_CS_IMU          defpin(PTB,6)
 #define SPI0_MOSI           defpin(PTB,5)   /* using spi0 */

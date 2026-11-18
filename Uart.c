@@ -229,10 +229,6 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
 
   /* Initialise the UART hardware */
   
-  /* AF enable */
-  
-  or_register (RCU, RCU_APB2EN, (1 << 0));
-  
   /* TODO the baud rate will need converting */
   
   write_register (base, USART_BAUD, UartConfig->BaudRate);

@@ -105,8 +105,6 @@ bool SpiInitialise (unsigned long base)
             break;
     }
 
-    or_register (RCU, RCU_APB2EN, 1 << 0);  /* Enable AF */
-
     /* TODO make sure SPI is in the correct mode here.  I think it is */
 
     /* Set PCLK/4 */

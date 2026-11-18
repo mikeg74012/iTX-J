@@ -95,79 +95,55 @@ bool I2cInitialise (i2cbus_e I2cBus, uint32_t BitRate)
     /* Configure up the I2C instance for this bus */
     switch (I2cBus)
     {
-#ifdef CS_USE_I2C0
-    case I2C_BUS_0:
-    	pBus->Instance = I2C0;
-        rcu_periph_clock_enable(RCU_I2C0);
+        case I2C_BUS_0:
+            pBus->Instance = I2C0;
+            
+            or_register (RCU, RCU_APB1EN, (1 << 21));
 
-        /* Set up GPIO pins for this port */
-        rcu_periph_clock_enable(I2C0_PORT_CLK);
-        gpio_init(I2C0_SCL_PORT, GPIO_MODE_AF_OD, GPIO_OSPEED_50MHZ, I2C0_SCL_PIN);
-        gpio_init(I2C0_SDA_PORT, GPIO_MODE_AF_OD, GPIO_OSPEED_50MHZ, I2C0_SDA_PIN);
-        rcu_periph_clock_enable(RCU_I2C0);
-        gpio_pin_remap_config(GPIO_I2C0_REMAP, ENABLE);
-    	break;
-#endif
-#ifdef CS_USE_I2C1
-    case I2C_BUS_1:
-    	pBus->Instance = I2C1;
-        rcu_periph_clock_enable(RCU_I2C1);
-
-        /* Set up GPIO pins for this port */
-        rcu_periph_clock_enable(I2C1_PORT_CLK);
-        gpio_init(I2C1_SCL_PORT, GPIO_MODE_AF_OD, GPIO_OSPEED_50MHZ, I2C1_SCL_PIN);
-        gpio_init(I2C1_SDA_PORT, GPIO_MODE_AF_OD, GPIO_OSPEED_50MHZ, I2C1_SDA_PIN);
-        gpio_pin_remap_config(GPIO_I2C1_REMAP, ENABLE);
-      break;
-#endif
-    default:
-    	pBus->Instance = 0;
-    	break;
+            /* Set up GPIO pins for this port */
+            
+            set_gpio_alternate (I2C0_SDA);
+            set_gpio_alternate (I2C0_SCL);
+            
+            or_register (AFIO, AFIO_PCF0, (1 << 1));    /* Remap I2C0 onto PB8 and PB9 */
+            
+            break;
+            
+        default:
+            pBus->Instance = 0;
+            break;
     }
 
     if (pBus->Instance)
     {
-        or_register (RCU, RCU_APB2EN, (1 << 0));
-      
-      /* configure I2C clock */
-      i2c_clock_config(pBus->Instance, BitRate, I2C_DTCY_2);
+        /* configure I2C clock */
+        
+        /* Always set 400000 bits per second and ignore the BitRate parameter */
+        
+        write_register (pBus->Instance, I2C_CKCFG, (1 << 15) | (APB1_SPEED / 400000));
+        write_register (pBus->Instance, I2C_CTL1, APB1_SPEED / 1000000);
 
-      /* configure I2C address */
-      i2c_mode_addr_config(pBus->Instance, I2C_I2CMODE_ENABLE, I2C_ADDFORMAT_7BITS, 0xFF);
-//      i2c_mode_addr_config(pBus->Instance, I2C_I2CMODE_ENABLE, I2C_ADDFORMAT_7BITS, 0x70);
+        /* Enable I2C */
+        
+        
+        /* configure I2C address */
+        
+        write_register (pBus->Instance, I2C_CKCFG, 0xff);
 
-      /* enable I2C */
-      i2c_enable(pBus->Instance);
-
-      /* enable acknowledge */
-      i2c_ack_config(pBus->Instance, I2C_ACK_ENABLE);
-
-      pBus->Initialized = true;
+        /* enable I2C */
+        or_register (pBus->Instance, I2C_CTL0, (1 << 0));
+        
+        /* enable acknowledge */
+        or_register (pBus->Instance, I2C_CTL0, (1 << 10));
+        
+        
+        pBus->Initialized = true;
     }
   }
   return (pBus->Initialized);
 }
 
 
-/**
- * @brief       De-initialise one I2C bus.
- * @param[in]   I2cBus : the I2C bus to de-init
- * @return      true on success, false on failure
- */
-bool I2cDeInitialise (i2cbus_e I2cBus)
-{
-  i2c_bus_t * pBus = &I2c[I2cBus];
-
-  /* deinit the I2C Bus instance */
-  i2c_deinit(pBus->Instance);
-
-  /* Reset the driver parameters */
-  pBus->Initialized = false;
-  pBus->Instance = 0;
-
-  return true;
-
-}
 
 
 /**
@@ -239,75 +215,118 @@ bool I2c_read_GG_bytes (i2cbus_e I2cBus, uint8_t bus_address, uint8_t* p_buffer,
       /* i2c read begin */
 
       /* wait until I2C bus is idle */
-      while(i2c_flag_get(I2Cn, I2C_FLAG_I2CBSY));
+      while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
+      
       if(2 == number_of_byte)
       {
-        i2c_ackpos_config(I2Cn,I2C_ACKPOS_NEXT);
+          or_register (I2Cn, I2C_CTL0, (1 << 11));          /* Set POAP */
       }
       /* send a start condition to I2C bus */
-      i2c_start_on_bus(I2Cn);
+      
+      or_register (I2Cn, I2C_CTL0, (1 << 8));           /* START */
+
       /* wait until SBSEND bit is set */
-      while(!i2c_flag_get(I2Cn, I2C_FLAG_SBSEND));
+
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 0)));
+
       /* send slave address to I2C bus */
-      i2c_master_addressing(I2Cn, bus_address, I2C_TRANSMITTER);
+      
+      write_register (I2Cn, I2C_DATA, bus_address & ~1);
+      
        /* wait until ADDSEND bit is set */
-      while(!i2c_flag_get(I2Cn, I2C_FLAG_ADDSEND));
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 1)));
+      
       /* clear the ADDSEND bit */
-      i2c_flag_clear(I2Cn,I2C_FLAG_ADDSEND);
-      /* wait until the transmit data buffer is empty */
-      while(SET != i2c_flag_get( I2Cn , I2C_FLAG_TBE));
+
+      read_register (I2Cn, I2C_STAT0);
+      read_register (I2Cn, I2C_STAT1);
+            
+/* wait until the transmit data buffer is empty */
+      
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 7)));    /* Wait until I2C_FLAG_TBE is set */
+      
+      /* Surely it's aleady enabled? */
+      
       /* enable I2Cn*/
-      i2c_enable(I2Cn);
+      
+      or_register (I2Cn, I2C_CTL0, (1 << 0));
+      
        /* send the first byte, or start address to read */
-      i2c_data_transmit(I2Cn, read_address);
+      
+      write_register (I2Cn, I2C_DATA, read_address);
+
       /* wait until BTC bit is set */
-      while(!i2c_flag_get(I2Cn, I2C_FLAG_BTC));
+
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+      
       /* send a start condition to I2C bus */
-      i2c_start_on_bus(I2Cn);
+      
+      or_register (I2Cn, I2C_CTL0, (1 << 8));           /* START */
+
       /* wait until SBSEND bit is set */
-      while(!i2c_flag_get(I2Cn, I2C_FLAG_SBSEND));
+
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 0)));
+
       /* send slave address to I2C bus */
-      i2c_master_addressing(I2Cn, bus_address, I2C_RECEIVER);
+
+      write_register (I2Cn, I2C_DATA, bus_address | 1);
+
       if(number_of_byte < 3)
       {
-        i2c_ack_config(I2Cn,I2C_ACK_DISABLE);       /* disable acknowledge */
+        and_register (pBus->Instance, I2C_CTL0, ~(1 << 10));        /* disable acknowledge */
       }
+      
       /* wait until ADDSEND bit is set */
-      while(!i2c_flag_get(I2Cn, I2C_FLAG_ADDSEND));
+
+      while(!(read_register (I2Cn, I2C_STAT0) & (1 << 1)));
+      
       /* clear the ADDSEND bit */
-      i2c_flag_clear(I2Cn,I2C_FLAG_ADDSEND);
+
+      read_register (I2Cn, I2C_STAT0);
+      read_register (I2Cn, I2C_STAT1);
+            
       if(1 == number_of_byte)
       {
-        i2c_stop_on_bus(I2Cn);          /* send a stop condition to I2C bus */
+        or_register (I2Cn, I2C_CTL0, (1 << 9));           /* STOP */
       }
+      
       /* while there is data to be read */
       while(number_of_byte)
       {
         if(3 == number_of_byte)
         {
-          while(!i2c_flag_get(I2Cn, I2C_FLAG_BTC));         /* wait until BTC bit is set */
+            /* wait until BTC bit is set */
+
+            while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+            
           /* disable acknowledge */
-          i2c_ack_config(I2Cn,I2C_ACK_DISABLE);
+
+            and_register (pBus->Instance, I2C_CTL0, ~(1 << 10));        /* disable acknowledge */
         }
         if(2 == number_of_byte)
         {
-          while(!i2c_flag_get(I2Cn, I2C_FLAG_BTC));         /* wait until BTC bit is set */
+            /* wait until BTC bit is set */
+
+            while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+            
           /* send a stop condition to I2C bus */
-          i2c_stop_on_bus(I2Cn);
+            
+            or_register (I2Cn, I2C_CTL0, (1 << 9));           /* STOP */
         }
         /* wait until the RBNE bit is set and clear it */
-        if(i2c_flag_get(I2Cn, I2C_FLAG_RBNE))
+        if(read_register (I2Cn, I2C_STAT0) & (1 << 6))
         {
-          *p_buffer = i2c_data_receive(I2Cn);       /* read a byte from device */
+          *p_buffer = read_register (I2Cn, I2C_DATA);       /* read a byte from device */
           p_buffer++; /* point to the next location where the byte read will be saved */
           number_of_byte--; /* decrement the read bytes counter */
         }
       }
-      while(I2C_CTL0(I2Cn)&0x0200);  /* wait until the stop condition is finished */
-      /* enable acknowledge */
-      i2c_ack_config(I2Cn,I2C_ACK_ENABLE);
-      i2c_ackpos_config(I2Cn,I2C_ACKPOS_CURRENT);
-      /* i2c read end */
+      while(read_register (I2Cn, I2C_CTL0) & 0x0200);  /* wait until the stop condition is finished */
+      
+    /* enable acknowledge */
+    or_register (pBus->Instance, I2C_CTL0, (1 << 10));        
+    and_register (I2Cn, I2C_CTL0, ~(1 << 11));          /* Clear POAP */
+    /* i2c read end */
  }
 
   return (Status);
@@ -334,8 +353,8 @@ bool I2c_read_GG_bytes (i2cbus_e I2cBus, uint8_t bus_address, uint8_t* p_buffer,
 static void I2cReadBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t* pBuffer, uint16_t NumberOfBytes)
 {
   /* wait until I2C bus is idle */
-  while (i2c_flag_get(I2Cn, I2C_FLAG_I2CBSY));
-
+  while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
+  
   /* send a start condition to I2C bus */
   i2c_start_on_bus(I2Cn);
 
@@ -403,8 +422,8 @@ static void I2cReadBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t* pBuffer,
 static void I2cWriteBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t * pBuffer, uint16_t NumberOfBytes)
 {
   /* wait until I2C bus is idle */
-  while (i2c_flag_get(I2Cn, I2C_FLAG_I2CBSY));
-
+  while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
+  
   /* send a start condition to I2C bus */
   i2c_start_on_bus(I2Cn);
 
