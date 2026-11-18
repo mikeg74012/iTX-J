@@ -353,60 +353,77 @@ bool I2c_read_GG_bytes (i2cbus_e I2cBus, uint8_t bus_address, uint8_t* p_buffer,
 static void I2cReadBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t* pBuffer, uint16_t NumberOfBytes)
 {
   /* wait until I2C bus is idle */
-  while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
+    
+    while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
   
-  /* send a start condition to I2C bus */
-  i2c_start_on_bus(I2Cn);
+    /* send a start condition to I2C bus */
+    
+    or_register (I2Cn, I2C_CTL0, (1 << 8));           /* START */
 
-  /* wait until SBSEND bit is set */
-  while (!i2c_flag_get(I2Cn, I2C_FLAG_SBSEND));
+    /* wait until SBSEND bit is set */
 
-  /* send slave address to I2C bus */
-  i2c_master_addressing(I2Cn, SlaveAddress, I2C_RECEIVER);
+    while(!(read_register (I2Cn, I2C_STAT0) & (1 << 0)));
 
-  if (NumberOfBytes < 3)
-  {
-    i2c_ack_config(I2Cn, I2C_ACK_DISABLE);       /* disable acknowledge */
-  }
-  /* wait until ADDSEND bit is set */
-  while (!i2c_flag_get(I2Cn, I2C_FLAG_ADDSEND));
+    /* send slave address to I2C bus */
+    
+    write_register (I2Cn, I2C_DATA, SlaveAddress | 1);
 
-  /* clear the ADDSEND bit */
-  i2c_flag_clear(I2Cn,I2C_FLAG_ADDSEND);
-
-  if (1 == NumberOfBytes)
-  {
-    i2c_stop_on_bus(I2Cn);          /* send a stop condition to I2C bus */
-  }
-
-  /* while there is data to be read */
-  while (NumberOfBytes)
-  {
-    if (3 == NumberOfBytes)
+    if (NumberOfBytes < 3)
     {
-      while (!i2c_flag_get(I2Cn, I2C_FLAG_BTC));         /* wait until BTC bit is set */
-      /* disable acknowledge */
-      i2c_ack_config(I2Cn,I2C_ACK_DISABLE);
+        and_register (I2Cn, I2C_CTL0, ~(1 << 10));        /* disable acknowledge */
     }
-    if (2 == NumberOfBytes)
+    
+    /* wait until ADDSEND bit is set */
+
+    while(!(read_register (I2Cn, I2C_STAT0) & (1 << 1)));
+
+    /* clear the ADDSEND bit */
+  
+    read_register (I2Cn, I2C_STAT0);
+    read_register (I2Cn, I2C_STAT1);
+
+    if (1 == NumberOfBytes)
     {
-      while (!i2c_flag_get(I2Cn, I2C_FLAG_BTC));         /* wait until BTC bit is set */
-      /* send a stop condition to I2C bus */
-      i2c_stop_on_bus(I2Cn);
+        or_register (I2Cn, I2C_CTL0, (1 << 9));           /* STOP */
     }
-    /* wait until the RBNE bit is set and clear it */
-    if (i2c_flag_get(I2Cn, I2C_FLAG_RBNE))
+
+    /* while there is data to be read */
+    while (NumberOfBytes)
     {
-      *pBuffer = i2c_data_receive(I2Cn);       /* read a byte from device */
-      pBuffer++; /* point to the next location where the byte read will be saved */
-      NumberOfBytes--; /* decrement the read bytes counter */
-    }
-  }
-  while (I2C_CTL0(I2Cn)&0x0200);  /* wait until the stop condition is finished */
+        if (3 == NumberOfBytes)
+        {
+            /* wait until BTC bit is set */
+          
+            while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+            
+            /* disable acknowledge */
+            
+            and_register (I2Cn, I2C_CTL0, ~(1 << 10));        /* disable acknowledge */
+        }
+        
+        if (2 == NumberOfBytes)
+        {
+            /* wait until BTC bit is set */
+          
+            while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+            
+            /* send a stop condition to I2C bus */
+            
+            or_register (I2Cn, I2C_CTL0, (1 << 9));           /* STOP */
+        }
+    
+        /* wait until the RBNE bit is set and clear it */
+        if(read_register (I2Cn, I2C_STAT0) & (1 << 6))
+        {
+            *pBuffer = read_register (I2Cn, I2C_DATA);       /* read a byte from device */
+            pBuffer++; /* point to the next location where the byte read will be saved */
+            NumberOfBytes--; /* decrement the read bytes counter */
+        }
+    } while(read_register (I2Cn, I2C_CTL0) & 0x0200);  /* wait until the stop condition is finished */
 
   /* enable acknowledge */
-  i2c_ack_config(I2Cn,I2C_ACK_ENABLE);
-  i2c_ackpos_config(I2Cn,I2C_ACKPOS_CURRENT);
+    or_register (I2Cn, I2C_CTL0, (1 << 10));        
+    and_register (I2Cn, I2C_CTL0, ~(1 << 11));          /* Clear POAP */
 }
 
 
@@ -421,110 +438,52 @@ static void I2cReadBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t* pBuffer,
 */
 static void I2cWriteBytes (uint32_t I2Cn, uint8_t SlaveAddress, uint8_t * pBuffer, uint16_t NumberOfBytes)
 {
-  /* wait until I2C bus is idle */
-  while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
+    /* wait until I2C bus is idle */
+    while(read_register (I2Cn, I2C_STAT1) & (1 << 1));    /* Wait while I2CBSY is 1 */
   
-  /* send a start condition to I2C bus */
-  i2c_start_on_bus(I2Cn);
+    /* send a start condition to I2C bus */
+    or_register (I2Cn, I2C_CTL0, (1 << 8));           /* START */
 
-  /* wait until SBSEND bit is set */
-  while (!i2c_flag_get(I2Cn, I2C_FLAG_SBSEND));
+    /* wait until SBSEND bit is set */
 
-  /* send slave address to I2C bus, wait until ADDSEND bit is set and clear it*/
-  i2c_master_addressing(I2Cn, SlaveAddress, I2C_TRANSMITTER);
+    while(!(read_register (I2Cn, I2C_STAT0) & (1 << 0)));
 
-  /* wait until ADDSEND bit is set */
-  while (!i2c_flag_get(I2Cn, I2C_FLAG_ADDSEND));
+    /* send slave address to I2C bus, wait until ADDSEND bit is set and clear it*/
+  
+    write_register (I2Cn, I2C_DATA, SlaveAddress & ~1);
 
-  /* clear the ADDSEND bit */
-  i2c_flag_clear(I2Cn,I2C_FLAG_ADDSEND);
+    /* wait until ADDSEND bit is set */
+    
+    while(!(read_register (I2Cn, I2C_STAT0) & (1 << 1)));
 
-  /* wait until the transmit data buffer is empty */
-  while (SET != i2c_flag_get(I2Cn, I2C_FLAG_TBE));
+    /* clear the ADDSEND bit */
+  
+    read_register (I2Cn, I2C_STAT0);
+    read_register (I2Cn, I2C_STAT1);
 
-  /* while there is data to be written */
-  while (NumberOfBytes--)
-  {
-    i2c_data_transmit(I2Cn, *pBuffer);
-    pBuffer++;
+    /* wait until the transmit data buffer is empty */
+  
+    while (!(read_register (I2Cn, I2C_STAT0) & (1 << 7)))
+        
 
-    /* wait until BTC bit is set */
-    while (!i2c_flag_get(I2Cn, I2C_FLAG_BTC));
-  }
+    /* while there is data to be written */
+        
+    while (NumberOfBytes--)
+    {
+        write_register (I2Cn, I2C_DATA, *pBuffer);
+        pBuffer++;
 
-  /* send a stop condition to I2C bus */
-  i2c_stop_on_bus(I2Cn);
+        /* wait until BTC bit is set */
+        while(!(read_register (I2Cn, I2C_STAT0) & (1 << 2)));
+    }
 
-  /* wait until the stop condition is finished */
-  while(I2C_CTL0(I2Cn)&0x0200);
+    /* send a stop condition to I2C bus */
+    or_register (I2Cn, I2C_CTL0, (1 << 9));           /* STOP */
+
+    /* wait until the stop condition is finished */
+    while(read_register (I2Cn, I2C_CTL0) & 0x0200);  /* wait until the stop condition is finished */
+  
 }
 
-
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-
-/**
- * @brief       Probe the I2C bus and display a list of active addresses on the bus
- * @param[in]   argCount    : The number of arguments passed from the console
- * @param[in]   pArguments  : The list of arguments passed from the console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int I2cConsoleProbe (int ArgCount, char **pArguments)
-{
-  return(CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Display I2C statistics
- * @param[in]   argCount    : The number of arguments passed from the console
- * @param[in]   pArguments  : The list of arguments passed from the console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int I2cConsoleStats (int ArgCount, char **pArguments)
-{
-  /* print title row */
-  ConsolePrintf("I2C#    Instance  TxCount   RxCount   ErrorCount\r");
-
-  /* print the status data */
-#if 0
-  for (int I2cIndex = 0; I2cIndex < NO_OF_I2C_BUSSES; I2cIndex++)
-  {
-    i2c_bus_t * pBus = &I2c[I2cIndex];
-    ConsolePrintf("%d     %d     %d\n\r",
-                 I2cIndex,
-                 pBus->Instance,
-				 I2c[I2cIndex].Error.TxCount,
-				 I2c[I2cIndex].Error.RxCount,
-				 I2c[I2cIndex].Error.ErrorCount
-                 );
-  }
-#endif
-  return(CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Reset all I2C statistics back to zero
- * @param[in]   argCount    : The number of arguments passed from the console
- * @param[in]   pArguments  : The list of arguments passed from the console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int I2cConsoleClear (int ArgCount, char **pArguments)
-{
-  /* Reset the statistics */
-  for (int I2cIndex = 0; I2cIndex < NO_OF_I2C_BUSSES; I2cIndex++)
-  {
-//    I2c[I2cIndex].Error.TxCount = 0;
-//    I2c[I2cIndex].Error.RxCount = 0;
-//    I2c[I2cIndex].Error.ErrorCount = 0;
-  }
-
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
 
 

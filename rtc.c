@@ -179,9 +179,6 @@ struct tm RtcGetDateTime (void)
 void RtcSetDateTime (struct tm dateTime, bool validSyncSrc)
 {
     uint32_t temp = RtcDateTimeToTimeStamp(dateTime);
-#ifdef DEBUG
-      RtcPrintTime (dateTime);
-#endif
     /* update current date,time */
     rtc_counter_set(temp);
     if (validSyncSrc)
@@ -199,13 +196,16 @@ void RtcSetDateTime (struct tm dateTime, bool validSyncSrc)
  */
 bool RtcGetWakeupFlag (void)
 {
-  if (rtc_flag_get(RTC_FLAG_ALARM) != RESET)
-  {
-    pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);   /* clear wake up flag*/
-    rtc_flag_clear(RTC_FLAG_ALARM);          /* clear the RTC second interrupt flag*/
-    return true;
-  }
-  return false;
+    if (read_register (RTC, RTC_CTL) & (1 << 1))
+    {
+        pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);   /* clear wake up flag*/
+        
+        and_register (RTC, RTC_CTL, ~(1 << 1));     /* clear the RTC second interrupt flag*/
+        
+        return true;
+    }
+    
+    return false;
 }
 
 /**
@@ -231,10 +231,11 @@ bool RtcTimeValid(void)
 void RtcSetWakeupTimer (uint32_t WakeUpDelayInSeconds)
 {
   /* clear wakeup flag if previously set */
-  if (rtc_flag_get(RTC_FLAG_ALARM) != RESET)
+  if (read_register (RTC, RTC_CTL) & (1 << 1))
   {
     pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);   /* clear wake up flag*/
-    rtc_flag_clear(RTC_FLAG_ALARM);          /* clear the RTC second interrupt flag*/
+    
+    and_register (RTC, RTC_CTL, ~(1 << 1));
   }
 
   /* Set up new periodic wake-up alarm */
@@ -244,7 +245,8 @@ void RtcSetWakeupTimer (uint32_t WakeUpDelayInSeconds)
   rtc_alarm_config(temp);                      /* set alarm */
   rtc_interrupt_enable(RTC_FLAG_ALARM);        /* RTC alarm on */
   exti_init(EXTI_17, EXTI_EVENT, EXTI_TRIG_RISING); /* set RTC alarm wake up event */
-  exti_interrupt_flag_clear(EXTI_17);
+
+    write_register (EXTI, EXTI_PD, (1 << 17));
 }
 
 
@@ -312,16 +314,19 @@ void RtcPrintTime (struct tm dateTime)
  */
 void RtcFlagCallback (void)
 {
-  if (rtc_flag_get(RTC_FLAG_SECOND) != RESET)
-  {
-    /* clear the RTC second interrupt flag*/
-    rtc_flag_clear(RTC_FLAG_SECOND);
-  }
-  if (rtc_flag_get(RTC_FLAG_ALARM) != RESET)
-  {
-    /* clear the RTC alarm interrupt flag*/
-    rtc_flag_clear(RTC_FLAG_ALARM);
-  }
+    if (read_register (RTC, RTC_CTL) & (1 << 0))
+    {
+        /* clear the RTC second interrupt flag*/
+
+        and_register (RTC, RTC_CTL, ~(1 << 0));
+    }
+
+    if (read_register (RTC, RTC_CTL) & (1 << 1))
+    {
+        /* clear the RTC alarm interrupt flag*/
+
+        and_register (RTC, RTC_CTL, ~(1 << 1));
+    }
 }
 
 
@@ -332,10 +337,10 @@ void RtcFlagCallback (void)
  */
 void RtcEXTICallback (void)
 {
-  if (exti_flag_get(EXTI_17) != RESET)
-  {
-    exti_interrupt_flag_clear(EXTI_17);
-  }
+    if (read_register (EXTI, EXTI_PD) & (1 << 17))
+    {
+        write_register (EXTI, EXTI_PD, (1 << 17));
+    }
 }
 
 
@@ -381,122 +386,3 @@ static void nvic_Rtc_configuration (void)
 }
 
 
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       Set a default time and date
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int RtcConsoleDefault (int argCount, char **pArguments)
-{
-  struct tm DateTime;
-
-  /*##-1- Configure the Date #################################################*/
-  /* Set Date: Tuesday January 1st 2020 */
-  DateTime.tm_mday = 01;
-  DateTime.tm_mon  = 00;          /* tm_mon format is months since Jan (so Jan is 0) */
-  DateTime.tm_year = 2020 - 1900; /* tm_year format is years since 1900 */
-  DateTime.tm_wday = 6;  /* 1-7 for Monday to Sunday, 2000-1-1 is Saturday */
-
-  /*##-2- Configure the Time #################################################*/
-  /* Set Time: 02:00:00 */
-  DateTime.tm_hour = 02;
-  DateTime.tm_min  = 00;
-  DateTime.tm_sec  = 00;
-
-  RtcSetDateTime(DateTime, false);  /* no valid flag for this default RTC setting */
-
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Set the current time and date
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int RtcConsoleSet (int argCount, char **pArguments)
-{
-  struct tm DateTime;
-  int Hour;
-  int Minute;
-  int Second;
-  int Day;
-  int Month;
-  int Year;
-  int wDay = 6;   // Default week of day as Saturday if not provided (ref Default Date is 2000-1-1)  
-
-  if ((2 == argCount) || (3 == argCount))
-  {
-    int inputWDay;
-
-    /* get the date and time from the command line */
-    sscanf(pArguments[0],  "%d-%d-%d", &Day, &Month, &Year);
-    sscanf(pArguments[1],  "%d:%d:%d", &Hour, &Minute, &Second);
-
-    DateTime.tm_hour = Hour;
-    DateTime.tm_min  = Minute;
-    DateTime.tm_sec  = Second;
-    DateTime.tm_mday = Day;
-    DateTime.tm_mon  = Month - 1;   /* tm_mon format is months since January (Jan = 0) */
-    DateTime.tm_year = Year - 1900; /* tm_year format is years since 1900 */
-
-
-    if (3 == argCount && sscanf(pArguments[2], "%d", &inputWDay) == 1)
-    {
-      /* validate the week of day */
-      if ((inputWDay >= 1) && (inputWDay <= 7))
-      {
-        wDay = inputWDay;
-      }
-    }
-
-    DateTime.tm_wday = wDay;
-
-    RtcSetDateTime(DateTime, true);  /* set from console, mark it as valid */
-
-    /* indicate success */
-    return (CONSOLE_ERROR_OK);
-  } 
-  return (CONSOLE_ARG_NO);
-}
-
-
-/**
- * @brief       Get the current time and date
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int RtcConsoleGet (int argCount, char **pArguments)
-{
-  RtcPrintCurrentTime();
-  ConsolePrintf("\n\r");
-  return (CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Get the current timestamp (seconds since 1/1/2000 00:00:00)
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int RtcConsoleTimeStamp (int argCount, char **pArguments)
-{
-  /* get the current date and time */
-  uint32_t TimeStamp = RtcGetTimeStamp();
-
-  /* Display the timestamp value */
-  ConsolePrintf("%d\n\r", TimeStamp);
-
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}

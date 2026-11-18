@@ -2221,9 +2221,6 @@
         <name>$PROJ_DIR$\configupdate.c</name>
     </file>
     <file>
-        <name>$PROJ_DIR$\console.c</name>
-    </file>
-    <file>
         <name>$PROJ_DIR$\Crc16.c</name>
     </file>
     <file>

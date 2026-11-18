@@ -16,7 +16,7 @@
 #include "hardware.h"
 #include "main.h"
 #include "acceldriver.h"
-#include "console.h"
+//#include "console.h"
 #include "memorymap.h"
 #include "hardwareVersion.h"
 //#include "ConsoleTables.h"

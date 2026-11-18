@@ -82,11 +82,6 @@ static int              ConsoleTokenise         (char *inputLine, char **tokenLi
 static void             ConsoleSetLastInputTime (void);
 
 // System Commands
-static int              ConsoleHelp             (int argCount, char **pArguments);
-static int              ConsoleAbout            (int argCount, char **pArguments);
-static int              ConsoleEcho             (int argCount, char **pArguments);
-static int              ConsoleLs               (int argCount, char **pArguments);
-static int              ConsoleBack             (int argCount, char **pArguments);
 
 
 /**
@@ -95,7 +90,7 @@ static int              ConsoleBack             (int argCount, char **pArguments
  **************************************************************************************************
  */
 #ifdef CONSOLE_USE_MUTEX
-static SemaphoreHandle_t  ConsoleMutex;
+//static SemaphoreHandle_t  ConsoleMutex;
 #endif
 
 /* Command tables containing all possible console commands */
@@ -142,10 +137,6 @@ void ConsoleInitialise (stream_t * pConsoleStream)
   pStream = pConsoleStream;
 
   /* create lock if needed */
-#ifdef CONSOLE_USE_MUTEX
-  ConsoleMutex = xSemaphoreCreateMutex();
-  xSemaphoreGive(ConsoleMutex);
-#endif
 
   ConsoleUpdatePrintable();
   /* Display the welcome banner */
@@ -384,174 +375,6 @@ char ConsoleGetc (void)
   return (tolower(pStream->Get()));
 }
 
-
-/**
- * @brief       Provides command line help to the operator.  Called from the Console, it may include
- *              command line arguments to specify which Console command help is required for.
- * @param[in]   argCount    : THe number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int ConsoleHelp (int argCount, char **pArguments)
-{
-  T_ConsoleLeaf *pLeaf;
-
-  /* general help? */
-  if (0 == argCount)
-  {
-    /* print the help */
-    ConsolePrintf("Usage: Help <command>\n\r");
-  }
-  else
-  {
-    /* find the command requested and print the help string */
-    pLeaf = FindLeaf(pCurrentTable, pArguments[0]);
-    if (NULL == pLeaf) pLeaf = FindLeaf(&ConsoleRootTable, pArguments[0]);
-    if (NULL != pLeaf)
-    {
-      ConsolePrintf(pLeaf->HelpString);
-      ConsolePrintf("\n\r");
-    }
-    else
-    {
-      ConsolePrintf("No such command\n\r");
-    }
-  }
-  return (CONSOLE_ERROR_OK);
- }
-
-
-/**
- * @brief       Print the system greeting message to the console.
- * @param[in]   argCount    : THe number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int ConsoleAbout (int argCount, char **pArguments)
-{
-  ConsolePrintf("\n\r");
-  ConsolePrintGreeting();
-  ConsolePrintVersion();
-  ConsolePrintf("HW Version: %s\n\r", HW_VERSION_NAME(GetHardwareVersion()));
-  ConsolePrintf("\n\r");
-  return(CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Turn echo on or off.  When echo is on, characters typed by the
- *              user are echoed back.
- * @param[in]   argCount    : THe number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int ConsoleEcho (int argCount, char **pArguments)
-{
-  if (1 == argCount)
-  {
-    if (!strcmp(pArguments[0], "on"))
-    {
-      Echo = true;
-      ConsolePrintf("echo on - OK\n\r");
-    }
-    if (!strcmp(pArguments[0], "off"))
-    {
-      Echo = false;
-      ConsolePrintf("echo off - OK\r\n");
-    }
-  }
-  else
-  {
-    ConsolePrintf("Usage: echo <on/off>\n\r");
-  }
-  return(CONSOLE_ERROR_OK);
- }
-
-
-/**
- * @brief       This function sets the Console current table to the parent table, therefore traversing one
- *              level up the tree, or "back".
- * @param[in]   argCount    : THe number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int ConsoleBack (int argCount, char **pArguments)
-{
-  pCurrentTable = &ConsoleRootTable;
-  ConsoleBuildPrompt(pCurrentTable, ConsolePrompt);
-
-  return (CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       List the available commands.  This depends on the current Console table.
- * @param[in]   argCount    : THe number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int ConsoleLs (int argCount, char **pArguments)
-{
-  unsigned int Count;
-
-  /* print the names of all commands at this level */
-  for (Count = 0; Count < MaxLeaves; Count++)
-  {
-    if (NULL == pCurrentTable->Leaf[Count].pFunction) break;
-    if ((0 != Count) && (0 == (Count % 6)))
-    {
-      ConsolePrintf("\n\r");
-    }
-    ConsolePrintf("  ");
-    ConsolePrintf(pCurrentTable->Leaf[Count].Name);
-  }
-
-  /* print the names of all branches */
-  for (Count = 0; Count < MaxBranches; Count++)
-  {
-    if (NULL == pCurrentTable->pBranch[Count]) break;
-    if (0 == (Count % 6))
-    {
-      ConsolePrintf("\n\r");
-    }
-    ConsolePrintf("  <");
-    ConsolePrintf(pCurrentTable->pBranch[Count]->Name);
-    ConsolePrintf(">");
-  }
-
-  ConsolePrintf("\n\r");
-  return (CONSOLE_ERROR_OK);
-}
-
-
-void ConsoleLock (void)
-{
-#ifdef CONSOLE_USE_MUTEX
-  xSemaphoreTake(ConsoleMutex, portMAX_DELAY);
-#endif
-}
-
-
-void ConsoleUnlock (void)
-{
-#ifdef CONSOLE_USE_MUTEX
-  xSemaphoreGive(ConsoleMutex);
-#endif
-}
-
-
-/**
- * @brief      Get the value of the "LastInputTime" member variable. This is the time of the
- *             last user input on the console (does not include output to console)
- * @param      None
- * @return     Time stamp of the last user input
- */
-uint32_t ConsoleGetLastInputTime (void)
-{
-  return LastInputTime;
-}
-
-
 /*
  **************************************************************************************************
  *                                        PRIVATE SECTION
@@ -610,78 +433,6 @@ static int ConsoleTokenise (char *inputLine, char **tokenList)
   return noOfTokens;
 }
 
-
-/**
- * @brief       This function parses a string received from the console.  The current table is searched
- *              for a command match, and the command is processed if a match is found.  If no match is
- *              found then we search for a sub-table match.
- * @param[in]   pTable        : THe current table to start the search with
- * @param[in]   CommandString : The command string to search for
- * @return      bool          : true if table entry found, false if not found
- */
-static bool ConsoleParseString (T_ConsoleTable *pTable, char *CommandString)
-{
-  int         TokenCount;
-  T_ConsoleLeaf  *pLeaf;
-  T_ConsoleTable *pBranch;
-  char       *TokenList[MaxTokens];
-  int         StringLength;
-  int         ErrorCode;
-
-  StringLength = strlen(CommandString);
-
-  /* break the console input into tokens */
-  TokenCount = ConsoleTokenise(CommandString, TokenList);
-
-  if (TokenCount > 0)
-  {
-    /* look for leaf */
-    pLeaf = FindLeaf(pTable, TokenList[0]);
-    if (NULL == pLeaf) pLeaf = FindLeaf(&ConsoleRootTable, TokenList[0]);
-    if (NULL != pLeaf)
-    {
-      /* execute the command */
-      ErrorCode = pLeaf->pFunction(TokenCount-1, &TokenList[1]);
-      if (CONSOLE_ERROR_OK != ErrorCode)
-      {
-        ConsoleDisplayError(ErrorCode);
-      }
-
-      /* indicate success */
-      return(true);
-    }
-
-    /* look for branch */
-    pBranch = FindBranch(pTable, TokenList[0]);
-    if (NULL != pBranch)
-    {
-      /*
-       * If there are arguments, pass the remainder of the command into
-       * the new table without actually traversing into the new table.
-       * i.e. execute from the current level
-       */
-      if (StringLength > strlen(TokenList[0]))
-      {
-        ConsoleParseString(pBranch, CommandString + strlen(TokenList[0]) + 1);
-      }
-      else
-      {
-        /* there are no arguments just traverse into the new table */
-        pCurrentTable = pBranch;
-        ConsoleBuildPrompt(pCurrentTable, ConsolePrompt);
-      }
-
-      /* indicate success */
-      return(true);
-    }
-
-    /* indicate failure */
-    ConsolePrintf("Unknown command ");
-    ConsolePrintf(TokenList[0]);
-    ConsolePrintf("\n\r");
-  }
-  return(false);
-}
 
 
 /**
@@ -750,47 +501,6 @@ static void ConsolePrintGreeting (void)
 }
 
 
-/**
- * @brief       This function prints the version string to the console
- * @param[in]   none
- * @return      none
- */
-static void ConsolePrintVersion (void)
-{
-  ConsolePrintf("Firmware Version ");
-  ConsolePrintf(FIRMWARE_VERSION);
-  ConsolePrintf("\n\r");
-  ConsolePrintf("FreeRTOS Version ");
-  ConsolePrintf(tskKERNEL_VERSION_NUMBER);
-  ConsolePrintf("\n\r");
-}
-
-
-/**
- * @brief       Print the specified error code to screen in stringified form
- * @param[in]   errorCode :  The error code to display
- * @return      none
- */
-static void ConsoleDisplayError (int errorCode)
-{
-  switch (errorCode)
-  {
-    case CONSOLE_ERROR_OK:
-      ConsolePrintf("OK\n\r");
-      break;
-    case CONSOLE_CMD_UNKNOWN:
-      ConsolePrintf("Unknown Command\n\r");
-      break;
-    case CONSOLE_ARG_NO:
-      ConsolePrintf("Wrong number of arguments\n\r");
-      break;
-    case CONSOLE_ARG_RANGE:
-      ConsolePrintf("Argument out of range\n\r");
-      break;
-    default:
-      ConsolePrintf("Unknown Error: 0x%x\n\r", errorCode);
-  }
-}
 
 
 /**

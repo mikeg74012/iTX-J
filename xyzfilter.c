@@ -157,35 +157,3 @@ void XyzGetOrientation (int * pPitch, int * pRoll)
  **************************************************************************************************
  */
 
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       Get XYZ data
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int XyzConsoleXyz (int ArgCount, char **pArguments)
-{
-  AccelerationData_t accelData;
-  int pitch;
-  int roll;
-
-  /* get the filtered acceleraion data */
-  XyzGetFilteredData(&accelData);
-
-  /* get the orientation */
-  XyzGetOrientation(&pitch, &roll);
-
-  /* output the data to console */
-  ConsolePrintf("XYZ X=%dmg,Y=%dmg,Z=%dmg\n\r", accelData.X, accelData.Y, accelData.Z);
-  ConsolePrintf("XYZ pitch=%d, roll=%d\n\r", pitch, roll);
-
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
-
-

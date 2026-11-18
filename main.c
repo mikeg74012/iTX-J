@@ -182,9 +182,6 @@ int main (void)
 
   init_threads ();
   
-  /* Console Thread */
-  add_thread ((void (*) (void)) ConsoleTask, &console_stack[(sizeof (CONSOLE_STACK_SIZE) / 4) - 1]);
-  
   /* Button Monitor Thread */
   add_thread ((void (*) (void)) ButtonMonitorTask, &button_monitor_stack[(sizeof (BUTTON_MONITOR_STACK_SIZE) / 4) - 1]);
   
@@ -264,59 +261,4 @@ void assert_failed (char *file, uint32_t line)
   tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 }
 #endif /* USE_FULL_ASSERT */
-
-
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       Print stack usage details to console
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int SystemConsoleStack (int ArgCount, char **pArguments)
-{
-/*
-  ConsolePrintf("TASK NAME        STK-REM STK-MAX(bytes)\n\r");
-  ConsolePrintf("Button Monitor   %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(buttonMonitorTaskHandle),  BUTTON_MONITOR_STACK_SIZE);
-  ConsolePrintf("Battery Monitor  %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(batteryMonitorTaskHandle), BATTERY_MONITOR_STACK_SIZE);
-  ConsolePrintf("Motion Monitor   %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(motionMonitorTaskHandle),  MOTION_MONITOR_STACK_SIZE);
-  ConsolePrintf("Console          %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(consoleTaskHandle),        CONSOLE_STACK_SIZE);
-  ConsolePrintf("Sequencer        %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(sequencerTaskHandle),      SEQUENCER_STACK_SIZE);
-  ConsolePrintf("Modem            %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(modemTaskHandle),          MODEM_STACK_SIZE);
-  ConsolePrintf("GSM Comms        %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(gsmCommsTaskHandle),       GSM_COMMS_STACK_SIZE);
-  ConsolePrintf("GNSS Comms       %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(gnssCommsTaskHandle),      GNSS_COMMS_STACK_SIZE);
-  ConsolePrintf("WiFi             %4lu    %4lu\n\r", uxTaskGetStackHighWaterMark(wifiTaskHandle),           WIFI_STACK_SIZE);
-*/
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Reset / reboot the device
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int SystemConsoleReset (int ArgCount, char **pArguments)
-{
-  /* only allow reset during system test */
-  if (TestModeGet())
-  {
-    /*
-     * Reboot the MCU
-     * WARNING - Never returns
-     */
-    PowerResetMCU();
-  }
-
-  ConsolePrintf("Only available in test mode\n\r");
-
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
 

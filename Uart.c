@@ -366,7 +366,7 @@ static bool UartPut (uint8_t uartIndex, uint8_t Data)
   /* if the uart is idle, we kick it off by enabling interrupts */
   if (false == UART[uartIndex].UartBusy)
   {
-    usart_interrupt_enable(UART[uartIndex].Instance, USART_INT_TBE);
+      or_register (UART[uartIndex].Instance, USART_CTL0, (1 << 7));
   }
 
   return (true);
@@ -404,7 +404,9 @@ static void UartTxData (uint8_t uartIndex)
   else
   {
     /* Disable interrupts if there is nothing else to send */
-    usart_interrupt_disable(u->Instance, USART_INT_TBE);
+      
+    and_register (u->Instance, USART_CTL0, ~(1 << 7));
+
   }
 }
 
@@ -478,35 +480,4 @@ static void UartErrorProcess (unsigned long base)
     }
 }
 
-
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       Display UART statistics
- *
- * @param[in]   argCount    : THe number of arguments passed from the CLI
- * @param[in]   pArguments  : The list of arguments passed from the CLI
- * @return      status code : CLI_ERROR_OK on success, error code on failure
- */
-int UARTConsoleStats (int ArgCount, char **pArguments)
-{
-  return(CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Reset all UART statistics back to zero
- *
- * @param[in]   argCount    : THe number of arguments passed from the CLI
- * @param[in]   pArguments  : The list of arguments passed from the CLI
- * @return      status code : CLI_ERROR_OK on success, error code on failure
- */
-int UARTConsoleClear (int ArgCount, char **pArguments)
-{
-  /* indicate success */
-  return (CONSOLE_ERROR_OK);
-}
 

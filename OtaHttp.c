@@ -132,37 +132,3 @@ void OtaHttpGetImageFile (void)
  */
 
 
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-
-/**
- * @brief       Get the manifest file via HTTP(S)
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int OtaHttpConsoleGetManifest  (int argCount, char **pArguments)
-{
-  /* get the manifest file from the URL in the config store */
-  OtaHttpGetManifest();
-
-  return (CONSOLE_ERROR_OK);
-}
-
-
-/**
- * @brief       Get the upgrade image file via HTTP(S)
- * @param[in]   argCount    : The number of arguments passed from the CLI
- * @param[in]   pArguments  : The list of arguments passed from the CLI
- * @return      status code : CLI_ERROR_OK on success, error code on failure
- */
-int OtaHttpConsoleGetImageFile (int argCount, char **pArguments)
-{
-  /* get the manifest file from the URL in the config store */
-  OtaHttpGetImageFile();
-
-  return (CONSOLE_ERROR_OK);
-}

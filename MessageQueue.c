@@ -460,37 +460,3 @@ static void MessageQueueIncrementWriteIndex (QInfo_t * pQueue)
   }
 }
 
-
-
-/*
- **************************************************************************************************
- *                                     COMMAND LINE INTERFACE
- **************************************************************************************************
- */
-/**
- * @brief       list the message queue count with type
- * @param[in]   argCount    : The number of arguments passed from the Console
- * @param[in]   pArguments  : The list of arguments passed from the Console
- * @return      status code : CONSOLE_ERROR_OK on success, error code on failure
- */
-int MessageQueueConsoleList (int ArgCount, char **pArguments)
-{
-  int msgType;
-
-  if (1 == ArgCount)
-  {
-    /* get the msg type from the command line */
-    sscanf(pArguments[0],  "%d", &msgType);
-    int cnt = MessageQueueCountMsgType(msgType);
-
-    ConsolePrintf("Message Type with %d cnt: %d\r\n", msgType, cnt);
-    return (CONSOLE_ERROR_OK);
-  }
-  else
-  {
-    ConsolePrintf("Total Journeys In Queue with duration %ds\r\n", MessageQueueGetTotalJourneyDuration());
-    return (CONSOLE_ERROR_OK);
-  }
-
-  return (CONSOLE_ARG_NO);
-}
