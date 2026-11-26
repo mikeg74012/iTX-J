@@ -175,6 +175,7 @@
 
 #define     SCB_VTOR            0x0008
 #define     SCB_AIRCR           0x000c
+#define     SCB_SCR             0x0010
 
 /* WWDG base definition */
 
@@ -400,14 +401,20 @@
 #define     disable_irq(irq)    write_register (NVIC, ICER0 + (((irq) >> 5) << 2), 1 << ((irq) & 0x1f))
 #define     set_irq_priority(irq,p)    (*(volatile unsigned char *)(NVIC+IPR0+(irq)) = (p))
 
+#define __wait_for_interrupt()  asm("wfi")
+#define __wait_for_event()  asm("wfe")
+         
 #define abs(x) ((((x))<0)?-(x):(x))
+
+#define SystemReset() write_register (SCB, SCB_AIRCR, (0x5fa << 16) | (read_register (SCB, SCB_AIRCR) & 0x700) | (1 << 2));
+
 
 void     set_gpio_low       (unsigned char val);
 void     set_gpio_high      (unsigned char val);
 void     set_gpio_output    (unsigned char val);
 void     set_gpio_enable_pullup(unsigned char val);
 void     set_gpio_enable_pulldown(unsigned char val);
-void     set_gpio_disable_pullup(unsigned char val);
+void     set_gpio_disable_pull(unsigned char val);
 void     set_gpio_open_drain(unsigned char val);
 void     set_gpio_analog    (unsigned char val);
 void     set_gpio_input     (unsigned char val);

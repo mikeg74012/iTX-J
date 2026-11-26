@@ -20,7 +20,7 @@
  */
 /* Debug trace for the Config module */
 #if TRACE_CONFIG_ENABLE
-  #define TRACE_CONFIG(...) TRACE_("CONFIG", __VA_ARGS__)
+  #define TRACE_CONFIG(...)
 #else
   #define TRACE_CONFIG(...)
 #endif
@@ -647,7 +647,7 @@ bool ConfigSetFlag (uint8_t flag, bool value)
   if (flag == CONFIG_FLAG_CONSOLE)
   {
     /* update the printable flag */
-    ConsoleUpdatePrintable();
+//    ConsoleUpdatePrintable();
   }
   else if (flag == CONFIG_FLAG_XYZ_NORMALISTATION)
   {

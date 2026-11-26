@@ -66,6 +66,119 @@ bool FlashInit (void)
 }
 
 
+void fmc_lock(void)
+{
+    /* set the LK bit */
+    
+    or_register (FMC, FMC_CTL0, (1 << 7));
+    
+}
+
+void fmc_unlock(void)
+{
+    if (!(read_register (FMC, FMC_CTL0) & (1 << 7)))
+    {
+        /* write the FMC unlock key */
+        write_register (FMC, FMC_KEY0, 0x45670123);
+        write_register (FMC, FMC_KEY0, 0xCDEF89AB);
+    }
+}
+
+unsigned char fmc_bank0_ready_wait(uint32_t timeout)
+{
+    unsigned char fmc_state = 0;
+  
+    /* wait for FMC ready */
+    do{
+        /* get FMC state */
+        
+        if (!(read_register (FMC, FMC_STAT0) & (1 << 0)))
+        {
+            /* Not busy */
+            
+            return 1;
+        }
+        
+        timeout--;
+    }while((0x00U != timeout));
+    
+
+    return 0;
+}
+
+unsigned char fmc_page_erase(uint32_t page_address)
+{
+    unsigned char fmc_state;
+    
+    fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+    
+    /* if the last operation is completed, start page erase */
+    
+    if(fmc_state)
+    {
+        or_register (FMC, FMC_CTL0, (1 << 1));
+        write_register (FMC, FMC_ADDR0, page_address);
+
+        /* Set START */
+        
+        or_register (FMC, FMC_CTL0, (1 << 6));
+
+        /* wait for the FMC ready */
+        fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+
+        /* reset the PER bit */
+
+        and_register (FMC, FMC_CTL0, ~(1 << 1));
+    }
+    
+    /* return the FMC state */
+    return fmc_state;
+}
+
+unsigned char fmc_word_program(uint32_t address, uint32_t data)
+{
+    unsigned char fmc_state;
+    
+    fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+
+    if(fmc_state)
+    {
+        /* set the PG bit to start program */
+        or_register (FMC, FMC_CTL0, (1 << 0));
+        
+        (*(volatile unsigned long *) address) = data;
+        
+        /* wait for the FMC ready */
+        fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+        /* reset the PG bit */
+        and_register (FMC, FMC_CTL0, ~(1 << 0));
+    }
+    
+    /* return the FMC state */
+    return fmc_state;
+}
+
+unsigned char fmc_halfword_program(uint32_t address, uint16_t data)
+{
+    unsigned char fmc_state;
+    
+    fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+  
+    if (fmc_state)
+    {
+        /* set the PG bit to start program */
+        or_register (FMC, FMC_CTL0, (1 << 0));
+       
+         (*(volatile unsigned short *) address) = data;
+       
+        /* wait for the FMC ready */
+        fmc_state = fmc_bank0_ready_wait(0x0fff0000);
+        /* reset the PG bit */
+        and_register (FMC, FMC_CTL0, ~(1 << 0));
+    }
+    /* return the FMC state */
+    return fmc_state;
+}
 
 
 /**

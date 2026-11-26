@@ -301,7 +301,7 @@ static bool WriteResetDataToPSRAM (uint8_t resetFlag)
     SerialRamWrite(startAddress+nl, GetHPFilerBufferPointer(), GetHPFilerBufferSize());
     nl +=  GetHPFilerBufferSize();
 
-    RtcPrintTimestamp(resetData.LastdhmTS);
+//    RtcPrintTimestamp(resetData.LastdhmTS);
     #ifdef DEBUG
       ConsolePrintf("-->Write ResetData block BC=%d ldhm=%u, PC=%u, Bspace = %d\r\n", nl, resetData.LastdhmTS, resetData.PacketCounts, SERIAL_RAM_LPSLEEP_KEEP_AREA_SIZE - nl);
     #endif

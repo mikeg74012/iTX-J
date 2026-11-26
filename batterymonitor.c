@@ -13,6 +13,7 @@
  */
 
 #include "global.h"
+#include "batterydischargecurve.h"
 
 
 /*
@@ -952,6 +953,10 @@ static void BatteryMonitorConfigureGpio (void)
   
   /* USB_DETECT also needs to generate an interrupt on both edges */
   
+#if 0
+  /* TODO I don't like interrupts on edges due to noise.  This may be required
+to wakeup the CPU from standby mode but this won't be needed with the new CPU */
+  
   /* interrupt init */
   InterruptConfig.irqPrePriority = 6;
   InterruptConfig.irqSubPriority = 0;
@@ -960,6 +965,9 @@ static void BatteryMonitorConfigureGpio (void)
 
   /* Enable the Interrupt */
   GpioEnableInterrupt(CHARGER_USB_DETECT_PORT, CHARGER_USB_DETECT_PIN);
+  
+#endif
+  
 }
 
 

@@ -86,7 +86,7 @@ bool TestModeGet (void)
 void TestModeSet (void)
 {
   RtcBkupWriteRegister(RTC_BACKUP_REGISTER_TESTMODE, TESTMODE_INIT_VALUE);
-  ConsoleUpdatePrintable();
+//  ConsoleUpdatePrintable();
 }
 
 
@@ -99,7 +99,7 @@ void TestModeSet (void)
 void TestModeClear (void)
 {
   RtcBkupWriteRegister(RTC_BACKUP_REGISTER_TESTMODE, 0);
-  ConsoleUpdatePrintable();
+//  ConsoleUpdatePrintable();
 }
 
 
@@ -124,7 +124,7 @@ void TestModeCountDown (void)
   {
     RtcBkupWriteRegister(RTC_BACKUP_REGISTER_TESTMODE, test_mode_cnt-1);
   }
-  ConsoleUpdatePrintable();
+//  ConsoleUpdatePrintable();
 }
 
 

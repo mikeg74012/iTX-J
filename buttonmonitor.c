@@ -14,6 +14,8 @@
 #include "global.h"
 
 
+#define TRACE_(...)
+
 /*
  **************************************************************************************************
  *                                        PRIVATE DEFINES
@@ -77,7 +79,7 @@ void ButtonMonitorTask (void const * argument)
             {
                 ButtonDown = true;
                 TRACE_("BUTTON", "Button Down\n\r");
-                tick0 = csGetTick();
+                tick0 = ms_timer;
                 SequencerButtonDown();
             }
         }
@@ -92,7 +94,7 @@ void ButtonMonitorTask (void const * argument)
             {
                 ButtonHoldCount = 0;
 
-                if ((csGetTick() - tick0) >= (BUTTON_PRESS_DELAY_MS - (2 * BUTTON_DEBOUNCE_MS)))
+                if ((ms_timer - tick0) >= (BUTTON_PRESS_DELAY_MS - (2 * BUTTON_DEBOUNCE_MS)))
                 {
                     SequencerButtonPress();
                 }

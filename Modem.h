@@ -77,7 +77,7 @@ typedef enum
 /* Structure for messages sent to the modem task */
 typedef struct
 {
-  uint8_t msgId;
+  int msgId;
   void *  parameter;
 } ModemMessage_t;
 

@@ -14,6 +14,9 @@
  */
 #include "global.h"
 
+#include "ModemCustomCancelAmr.h"
+#include "ModemCustomStartAmr.h"
+
 
 /*
  **************************************************************************************************
@@ -25,6 +28,9 @@
 
 /* length of message queue */
 #define MODEM_QUEUE_LENGTH             16
+
+static Queue ModemQueue;
+static ModemMessage_t QueueData[MODEM_QUEUE_LENGTH];
 
 /* time for modem to boot after its power is turned on */
 #define MODEM_BOOT_TIME_MS             3000
@@ -190,13 +196,15 @@ char GNSSData    [GNSS_DATA_SIZE];     /* GNSS data, used in gsmGNSS.c */
  **************************************************************************************************
  */
 /* message queue for posting messages to the modem task */
-static QueueHandle_t     modemQueue;
+static Queue modemQueue;
 
 /* flag to indicate if the Modem can off GSM Only (By Hardware modification) */
 static bool              modemSupportStandAlone = false;
 
 /* flag to indicate if the current action need to be abort */
 static bool              modemAbort = false;
+
+static unsigned char aborted;
 
 /* value to be report for any netowork connection error with reason */
 static NetworkConnError_t networkConnErr = NETWORK_NO_ERR;
@@ -318,15 +326,15 @@ static uint8_t MessageBuffer[MESSAGE_MAX_MESSAGE_SIZE];
  */
 void ModemTask (void const * argument)
 {
-  ModemMessage_t  message;
+  ModemMessage_t message;
 
   WatchdogSetTimeoutLength(GSMMANAGERTASK, 1000 * 60 * 60);   // Modem task can be busy for extended periods (e.g. making a call).  Set a 1 hour timeout here
 
   /* create a message queue for this task */
-  modemQueue = xQueueCreate(MODEM_QUEUE_LENGTH, sizeof(ModemMessage_t));
+  xQueueCreate(&ModemQueue, MODEM_QUEUE_LENGTH, QueueData);
 
   /* create a semaphore for the signal of abort message enqueued */
-  abortSemaphore = xSemaphoreCreateBinary();
+  aborted = 0;
 
   /* modem always starts powered down */
   ModemPowerState = MPS_ALL_OFF;
@@ -340,16 +348,18 @@ void ModemTask (void const * argument)
     WatchdogSetWaiting(GSMMANAGERTASK);
 
     /* Wait indefinitely for the next message from the modem queue */
-    if (xQueueReceive(modemQueue, &message, portMAX_DELAY) == pdPASS)
+    if (xQueueReceive(&modemQueue, &message, portMAX_DELAY))
     {      
       /* Check if the abort semaphore is set. If so, consume all messages until we find the abort message */ 
-      if (xSemaphoreTake(abortSemaphore, 0) == pdTRUE)
+      if (aborted)
       {
+          aborted = 0;
+          
         /* Abort signaled, consume all messages until ABORT is found */
         if (message.msgId != MODEM_MSG_ABORT)
         {
           TRACE_MODEM("ModemTask: Flushing message %d\n\r", message.msgId);
-          while (xQueueReceive(modemQueue, &message, 0) == pdPASS)
+          while (xQueueReceive(&modemQueue, &message, 0))
           {
             if (message.msgId == MODEM_MSG_ABORT)
             {
@@ -2311,9 +2321,9 @@ static void ModemEnqueueMessage (uint8_t msgId, void * parameter)
   if (message.msgId == MODEM_MSG_ABORT)
   {
     /* Signal semaphore that ABORT is queued */
-    xSemaphoreGive(abortSemaphore);
+    aborted = 1;
   }
-  xQueueSendToBack(modemQueue, &message, portMAX_DELAY);
+  xQueueSendToBack(&modemQueue, &message, portMAX_DELAY);
 }
 
 

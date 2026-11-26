@@ -23,6 +23,7 @@
 
 #define  GASGUAGE_ID_PN_MASK       0x10     /* Vender identifier reported by GASGuage Chip */
 
+static i2cbus_e GasGaugeBus;
 
 /*
  **************************************************************************************************
@@ -54,17 +55,10 @@ GASGAUGE_status_t GasGaugeInit (void)
 {
   GASGAUGE_status_t status = GASGAUGE_ERROR;
 
+    GasGaugeBus = 0;
+
   status = GASGAUGE_Startup();
 
-  if (status == GASGAUGE_OK)
-  {
-    TRACE_("GAS_GUAGE", "Gas Gauge Initialised Successfully\n\r");
-    /* results available */
-  }
-  else
-  {
-    TRACE_("GAS_GUAGE", "Error in Gas Gauge Initialisation\n\r");
-  }
   return status;
 }
 

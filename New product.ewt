@@ -2931,9 +2931,6 @@
         <name>$PROJ_DIR$\acceldriver.c</name>
     </file>
     <file>
-        <name>$PROJ_DIR$\assgabsgas.c</name>
-    </file>
-    <file>
         <name>$PROJ_DIR$\batterycharger.c</name>
     </file>
     <file>
@@ -2959,6 +2956,9 @@
     </file>
     <file>
         <name>$PROJ_DIR$\csp.c</name>
+    </file>
+    <file>
+        <name>$PROJ_DIR$\cstartup_M.c</name>
     </file>
     <file>
         <name>$PROJ_DIR$\DetectEvent.c</name>
@@ -3115,6 +3115,9 @@
     </file>
     <file>
         <name>$PROJ_DIR$\wifi.c</name>
+    </file>
+    <file>
+        <name>$PROJ_DIR$\xqueue.c</name>
     </file>
     <file>
         <name>$PROJ_DIR$\xtimer.c</name>

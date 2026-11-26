@@ -666,7 +666,7 @@
                 <option>
                     <name>OOCOutputFormat</name>
                     <version>3</version>
-                    <state>0</state>
+                    <state>3</state>
                 </option>
                 <option>
                     <name>OCOutputOverride</name>
@@ -674,7 +674,7 @@
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state>New product.srec</state>
+                    <state>New product.bin</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -682,7 +682,7 @@
                 </option>
                 <option>
                     <name>OOCObjCopyEnable</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
             </data>
         </settings>
@@ -2203,9 +2203,6 @@
         <name>$PROJ_DIR$\acceldriver.c</name>
     </file>
     <file>
-        <name>$PROJ_DIR$\assgabsgas.c</name>
-    </file>
-    <file>
         <name>$PROJ_DIR$\batterycharger.c</name>
     </file>
     <file>
@@ -2231,6 +2228,9 @@
     </file>
     <file>
         <name>$PROJ_DIR$\csp.c</name>
+    </file>
+    <file>
+        <name>$PROJ_DIR$\cstartup_M.c</name>
     </file>
     <file>
         <name>$PROJ_DIR$\DetectEvent.c</name>
@@ -2387,6 +2387,9 @@
     </file>
     <file>
         <name>$PROJ_DIR$\wifi.c</name>
+    </file>
+    <file>
+        <name>$PROJ_DIR$\xqueue.c</name>
     </file>
     <file>
         <name>$PROJ_DIR$\xtimer.c</name>

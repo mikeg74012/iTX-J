@@ -19,8 +19,12 @@
  *                                        PRIVATE DEFINES
  **************************************************************************************************
  */
-#define VECT_TAB_OFFSET 0x10000
+//#define VECT_TAB_OFFSET 0x10000
+#define VECT_TAB_OFFSET 0x0
 
+#define RCU_MODIFY      {volatile uint32_t i; \
+                         or_register (RCU, RCU_CFG0, (1 << 7)); \
+                         for(i=0;i<20000;i++);}
 
 /*
  **************************************************************************************************
@@ -44,6 +48,406 @@ unsigned long modem_stack[MODEM_STACK_SIZE / 4];
 unsigned long gsm_comms_stack[GSM_COMMS_STACK_SIZE / 4];
 unsigned long gnss_comms_stack[GNSS_COMMS_STACK_SIZE / 4];
 unsigned long wifi_stack[WIFI_STACK_SIZE / 4];
+
+
+volatile unsigned long ms_timer;
+
+const unsigned long gpio_bases[] = {GPIOA, GPIOB, GPIOC, GPIOD, GPIOE,
+                                    GPIOF, GPIOG};
+
+
+
+void set_gpio_alternate(unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	/* Select mode CTL 2 and MD 1 for AFIO push pull output */
+
+    
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+    
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (9 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (9 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+}
+
+void	set_gpio_speed (unsigned char val, unsigned char mode)
+{
+}
+
+void set_gpio_alt_map(unsigned char val, unsigned char mode)
+{
+}
+
+void	set_gpio_analog (unsigned char val)
+{
+	unsigned long *d;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	/* Select mode CTL 0 and MD 0 for analog input */
+
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+    }
+}
+
+void	set_gpio_output (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	/* Select mode CTL 0 and MD 3 for push pull output */
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (3 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (3 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+
+}
+
+void	set_gpio_open_drain (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	/* Select mode CTL 0 and MD 3 for push pull output */
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (7 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (7 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+
+}
+
+void	set_gpio_enable_pullup (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+    
+    set_gpio_high (val);
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (8 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (8 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+}
+
+void	set_gpio_enable_pulldown (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+    
+    set_gpio_low (val);
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (8 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (8 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+}
+
+void	set_gpio_high_speed (unsigned char val)
+{
+    /* All outputs are high speed by default */
+    
+}
+
+void	set_gpio_disable_pull (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+    
+    set_gpio_high (val);
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (4 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (4 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+}
+
+void	set_gpio_pull_down (unsigned char val)
+{
+}
+
+void	set_gpio_no_pull (unsigned char val)
+{
+}
+
+void	set_gpio_input (unsigned char val)
+{
+	unsigned long *d;
+    unsigned long state;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	/* Select mode CTL 1 and MD 0 for push pull output */
+
+    state = cpu_is_irq_enabled();
+    __disable_interrupts();
+ 
+    val = val & 0xf;
+
+    if (val & 0x8)
+    {
+        d[GPIO_CTL1 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL1 >> 2] |= (4 << ((val & 0x7) << 2));
+    }
+    else
+    {
+        d[GPIO_CTL0 >> 2] &= ~(0xf << ((val & 0x7) << 2));
+        d[GPIO_CTL0 >> 2] |= (4 << ((val & 0x7) << 2));
+    }
+
+    if (state)
+    {
+        __enable_interrupts();
+    }
+
+}
+
+
+void	set_gpio_high (unsigned char val)
+{
+	unsigned long *d;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	d[GPIO_BOP >> 2] = ((unsigned long) 1) << (val & 0xf);
+}
+
+void	set_gpio_low (unsigned char val)
+{
+	unsigned long *d;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	d[GPIO_BC >> 2] = ((unsigned long) 1) << (val & 0xf);
+}
+
+unsigned long read_gpio (unsigned char val)
+{
+	unsigned long *d;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	return (unsigned long) (d[GPIO_ISTAT >> 2] & (1 << (val & 0xf)));
+}
+
+unsigned long read_gpio_output (unsigned char val)
+{
+	unsigned long *d;
+
+	d = (unsigned long *) gpio_bases[val >> 4];
+
+	return (unsigned long) (d[GPIO_OCTL >> 2] & (1 << (val & 0xf)));
+}
+
+static void system_clock_config(void)
+{
+    uint32_t timeout = 0U;
+    uint32_t stab_flag = 0U;
+    
+    /* enable IRC8M */
+    
+    or_register (RCU, RCU_CTL, (1 << 0));
+
+    /* wait until IRC8M is stable or the startup time is longer than IRC8M_STARTUP_TIMEOUT */
+    do{
+        timeout++;
+        stab_flag = read_register (RCU, RCU_CTL) & (1 << 1);
+    }
+    while(0U == stab_flag);
+
+    /* LDO output voltage high mode */
+    or_register (RCU, RCU_APB1EN, (1 << 28));
+    or_register (PMU, PMU_CTL, (3 << 14));
+
+    /* IRC8M is stable */
+    /* AHB = SYSCLK */
+    //or_register (RCU, RCU_CFG0, RCU_AHB_CKSYS_DIV1);
+    /* APB2 = AHB/1 */
+    //or_register (RCU, RCU_CFG0, RCU_APB2_CKAHB_DIV1);
+    /* APB1 = AHB/2 */
+    or_register (RCU, RCU_CFG0, (4 << 8));
+
+    /* CK_PLL = (CK_IRC8M/2) * 12 = 48 MHz */
+    and_register (RCU, RCU_CFG0, ~((0xf << 18) | (1 << 27) | (1 << 30)));
+    or_register (RCU, RCU_CFG0, (10 << 18));
+
+    /* enable PLL */
+    or_register (RCU, RCU_CTL, (1 << 24));
+
+    /* wait until PLL is stable */
+    while(0U == (read_register (RCU, RCU_CTL) & (1 << 25)))
+    {
+    }
+    
+    /* enable the high-drive to extend the clock frequency to 120 MHz */
+    or_register (PMU, PMU_CTL, (1 << 16));
+    
+    while(0U == (read_register (PMU, PMU_CS) &  (1 << 16)))
+    {
+    }
+    
+    /* select the high-drive mode */
+    or_register (PMU, PMU_CTL, (1 << 17));
+    
+    while(0U == (read_register (PMU, PMU_CS) &  (1 << 17)))
+    {
+    }
+    
+    /* select PLL as system clock */
+    and_register (RCU, RCU_CFG0, ~(3 << 0));
+    or_register (RCU, RCU_CFG0, 2);
+
+    /* wait until PLL is selected as system clock */
+    while(0U == (read_register (RCU, RCU_CFG0) & (2 << 2)))
+    {
+    }
+}
+
+void SystemInit (void)
+{
+    /* reset the RCU clock configuration to the default reset state */
+    /* Set IRC8MEN bit */
+    or_register (RCU, RCU_CTL, (1 << 0));
+
+    RCU_MODIFY
+    
+    and_register (RCU, RCU_CFG0, ~(3 << 0));
+
+    /* reset HXTALEN, CKMEN and PLLEN bits */
+    and_register (RCU, RCU_CTL, ~((1 << 24) | (1 << 19) | (1 << 16)));
+    
+    /* disable all interrupts */
+    write_register (RCU, RCU_INT, 0x009f0000U);
+
+    /* reset HXTALBPS bit */
+    
+    and_register (RCU, RCU_CTL, ~(1 << 18));
+    
+    /* Reset CFG0 and CFG1 registers */
+    write_register (RCU, RCU_CFG0, 0x00000000U);
+    write_register (RCU, RCU_CFG1, 0x00000000U);
+
+    /* configure the system clock source, PLL Multiplier, AHB/APBx prescalers and Flash settings */
+    system_clock_config();
+}
 
 
 /**
@@ -106,8 +510,7 @@ int main (void)
   UartConfig.Parity   = COM_PARITY_NONE;
   UartConfig.FlowControl = COM_FLOWCONTROL_NONE;
   pStream = UARTInitialise(CONSOLE_UART, &UartConfig);
-  ConsoleInitialise(pStream);
-
+  
   /* Initialise the serial SRAM */
   SerialRamInit();
 
@@ -127,7 +530,9 @@ int main (void)
   StatusLogInitialize();
 
   /* set the exception vector table location */
-  nvic_vector_table_set(NVIC_VECTTAB_FLASH, VECT_TAB_OFFSET);  /* set vector offset */
+  
+    write_register (SCB, SCB_VTOR, 0x8000000 | VECT_TAB_OFFSET);
+    __DSB();
 
   set_irq_priority (41, 6);
   enable_irq (41);          /* Enable RTC alarm interrupt */
@@ -262,3 +667,8 @@ void assert_failed (char *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
+
+void SysTick_Handler( void )
+{
+    ms_timer++;
+}

@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <ctype.h>
+#include <intrinsics.h>
 #include "GD32F30x.h"
 #include "hardware.h"
 #include "main.h"
@@ -26,14 +27,12 @@
 #include "fitment.h"
 #include "flash.h"
 #include "gasgauge.h"
-#include "ModemCustomCancelAmr.h"
 #include "threads.h"
 #include "led.h"
 #include "tasks.h"
 #include "buttonmonitor.h"
 #include "batterycharger.h"
 #include "batterymonitor.h"
-#include "batterydischargecurve.h"
 #include "motionmonitor.h"
 #include "GsmAudio.h"
 #include "GsmBle.h"
@@ -77,7 +76,11 @@
 #include "fitment.h"
 #include "ringbuffer.h"
 #include "xtimer.h"
+#include "xqueue.h"
+#include "version.h"
 
+#define ConsolePrintf(...)
+#define TRACE_(...)
 
 
 #endif

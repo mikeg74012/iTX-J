@@ -157,6 +157,8 @@ static void     MotionMonitorProcessDHMAndInstantEvents   (void);
  */
 void MotionMonitorTask (void const *argument)
 {
+    unsigned long last_mm_timer;
+    
   spoofImpact = false;
   spoofStartOfJourney = false;
   spoofEndOfJourney = false;
@@ -197,6 +199,8 @@ void MotionMonitorTask (void const *argument)
     ConsolePrintf("--->Boot up Normal Mode! %d\r\n", IsLowPowerSleepFlagUp());
   }
 
+  last_mm_timer = ms_timer;
+  
   /* Infinite loop */
   for (;;)
   {
@@ -213,6 +217,8 @@ void MotionMonitorTask (void const *argument)
         
         continue;
     }
+    
+    last_mm_timer = ms_timer;
     
   WatchdogSetActive(MOTIONMONITORTASK);
 
@@ -635,7 +641,6 @@ static bool ReadyToSleep (bool printDetails)
 
   /* gather system state information */
   bool SeqBusy = SequencerBusy();
-  bool ConsoleBusy = (RtcGetTimeStamp() < (ConsoleGetLastInputTime() + MM_CONSOLE_STAY_AWAKE_SECONDS));
   bool SojInProcess = (IN_JOURNEY != motionMonitorState) && (ENDING_JOURNEY != motionMonitorState) && (DetectEventSojInProcess());
   bool ImpactInProcess = DetectEventImpactInProcess();
   bool TestMode =   TestModeGet();
@@ -645,7 +650,6 @@ static bool ReadyToSleep (bool printDetails)
   if ( (sleepAllowed)
     && (!WakeupCount)
     && (!SeqBusy)
-    && (!ConsoleBusy)
     && (!SojInProcess)
     && (!ImpactInProcess)
     && (!RBDown)
@@ -982,7 +986,7 @@ static eMmState GetStandByWakeupCause (void)
   usb_cable_state = read_gpio (USB_DETECT);
   red_buttone_state = read_gpio (USER_BUTTON);
 #ifdef GD32F30X_HD
-  if ((PMU_CS & PMU_FLAG_WAKEUP) == PMU_FLAG_WAKEUP)
+  if (read_register (PMU, PMU_CS) & (1 << 0))
 #else
   if(__HAL_PWR_GET_FLAG(PWR_FLAG_WU) != RESET)
 #endif

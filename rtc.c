@@ -59,46 +59,63 @@ bool RtcInit (void)
   if (read_register (BKP, RTC_BACKUP_REGISTER_CLOCKSET) != 0xA5A5)  /* not set up yet, first time  */
   {
     /* enable PMU and BKPI clocks */
-    rcu_periph_clock_enable(RCU_BKPI);
-    rcu_periph_clock_enable(RCU_PMU);
+     
+    or_register (RCU, RCU_APB1EN, (3 << 27));
 
     /* allow access to BKP domain */
-    pmu_backup_write_enable();
+    or_register (PMU, PMU_CTL, (1 << 8));
 
     /* reset backup domain */
-    bkp_deinit();
-
+    
+    or_register (RCU, RCU_BDCTL, (1 << 16));
+    and_register (RCU, RCU_BDCTL, ~(1 << 16));
+    
     /* enable LXTAL */
-    rcu_osci_on(RCU_LXTAL);
-    rcu_osci_stab_wait(RCU_LXTAL);
+    
+    or_register (RCU, RCU_BDCTL, (1 << 0));
+    
+    while (!(read_register (RCU, RCU_BDCTL) & (1 << 1)));
 
     /* select RCU_LXTAL as RTC clock source */
-    rcu_rtc_clock_config(RCU_RTCSRC_LXTAL);
-
+    
+    write_register (RCU, RCU_BDCTL, (read_register (RCU, RCU_BDCTL) & ~(3 << 8)) | (1 << 8));
+    
     /* enable RTC Clock */
-    rcu_periph_clock_enable(RCU_RTC);
+    
+    or_register (RCU, RCU_BDCTL, (1 << 15));
+    
     /* wait for RTC registers synchronization */
-    rtc_register_sync_wait();
-
+    
+    while (!(read_register (RTC, RTC_CTL) & (1 << 3)));
+    
     /* wait until last write operation on RTC registers has finished */
-    rtc_lwoff_wait();
-
+    while (!(read_register (RTC, RTC_CTL) & (1 << 5)));
+    
     /* enable the RTC alarm interrupt*/
-    rtc_interrupt_enable(RTC_INT_ALARM);
-    rtc_lwoff_wait();
+    
+    or_register (RTC, RTC_INTEN, (1 << 1));
 
+    while (!(read_register (RTC, RTC_CTL) & (1 << 5)));
+    
     /* set RTC prescaler: set RTC period to 1s */
-    rtc_prescaler_set(32767);
-    rtc_lwoff_wait();
-
-    bkp_write_data(RTC_BACKUP_REGISTER_CLOCKSET, 0xA5A5); /* set flag */
+    
+    write_register (RTC, RTC_PSCL, 32767);
+    write_register (RTC, RTC_PSCH, 0);
+    
+    while (!(read_register (RTC, RTC_CTL) & (1 << 5)));
+    
+    write_register (BKP, RTC_BACKUP_REGISTER_CLOCKSET, 0xA5A5); /* set flag */
   }
   else
   {
     /* allow write access to BKP domain */
-    rcu_periph_clock_enable(RCU_BKPI);
-    rcu_periph_clock_enable(RCU_PMU);
-    pmu_backup_write_enable();
+    /* enable PMU and BKPI clocks */
+     
+    or_register (RCU, RCU_APB1EN, (3 << 27));
+
+    /* allow access to BKP domain */
+    or_register (PMU, PMU_CTL, (1 << 8));
+
 
     /* No need to reconfig RTC if it setup already */
     /* The RTC core (prescaler, divider, counter and alarm) is reset only by a backup domain reset.*/
@@ -132,12 +149,55 @@ struct tm RtcTimeStampToDateTime (uint32_t timestamp)
 {
   static time_t timeStampUnix;
   static struct tm DateTime;
+  struct tm *result;
 
   timeStampUnix = (time_t)(timestamp + SECONDS_SINCE_1970_TO_2000);
-  localtime_r(&timeStampUnix, &DateTime);
+  result = localtime(&timeStampUnix);
+  
+  memcpy (&DateTime, result, sizeof (struct tm));
   return DateTime;
 }
 
+void rtc_configuration_mode_enter(void)
+{
+    or_register (RTC, RTC_CTL, (1 << 4));
+}
+
+/*!
+    \brief      exit RTC configuration mode 
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void rtc_configuration_mode_exit(void)
+{
+    and_register (RTC, RTC_CTL, ~(1 << 4));
+}
+
+
+void rtc_counter_set(uint32_t cnt)
+{
+    rtc_configuration_mode_enter();
+    /* set the RTC counter high bits */
+    
+    write_register (RTC, RTC_CNTH, cnt >> 16);
+    
+    /* set the RTC counter low bits */
+    write_register (RTC, RTC_CNTL, cnt & 0xffff);
+    
+    rtc_configuration_mode_exit();
+}
+
+uint32_t rtc_counter_get(void)
+{
+    uint32_t temp;
+    
+    temp = read_register (RTC, RTC_CNTL);
+    
+    temp |= read_register (RTC, RTC_CNTL) << 16;
+    
+    return temp;
+}
 
 /**
  * @brief   Get the current RTC time as a timestamp (seconds since 1/1/2000 00:00:00)
@@ -198,7 +258,7 @@ bool RtcGetWakeupFlag (void)
 {
     if (read_register (RTC, RTC_CTL) & (1 << 1))
     {
-        pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);   /* clear wake up flag*/
+        or_register (PMU, PMU_CTL, (1 << 2));       /* Reset wakeup flag */
         
         and_register (RTC, RTC_CTL, ~(1 << 1));     /* clear the RTC second interrupt flag*/
         
@@ -215,13 +275,26 @@ bool RtcGetWakeupFlag (void)
  */
 bool RtcTimeValid(void)
 {
-  if (bkp_read_data(RTC_BACKUP_REGISTER_CLOCK_SYNCED) != RTC_CLOCK_SYNCED)  /* not set up yet, first time  */
+  if (read_register (BKP, RTC_BACKUP_REGISTER_CLOCK_SYNCED) != RTC_CLOCK_SYNCED)  /* not set up yet, first time  */
   {
     return false;
   }
   return true;
 }
 
+void rtc_alarm_config(uint32_t alarm)
+{
+    rtc_configuration_mode_enter();
+    /* set the alarm high bits */
+    
+    write_register (RTC, RTC_ALRMH, alarm >> 16);
+    
+/* set the alarm low bits */
+
+    write_register (RTC, RTC_ALRML, alarm & 0xffff);
+    
+    rtc_configuration_mode_exit();
+}
 
 /**
  * @brief   Set the wakeup timer to wake the device after a delay
@@ -233,19 +306,33 @@ void RtcSetWakeupTimer (uint32_t WakeUpDelayInSeconds)
   /* clear wakeup flag if previously set */
   if (read_register (RTC, RTC_CTL) & (1 << 1))
   {
-    pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);   /* clear wake up flag*/
+    or_register (PMU, PMU_CTL, (1 << 2));       /* Reset wakeup flag */
     
     and_register (RTC, RTC_CTL, ~(1 << 1));
   }
 
   /* Set up new periodic wake-up alarm */
-  rtc_interrupt_disable(RTC_FLAG_ALARM);        /* RTC alarm off */
-  uint32_t temp = rtc_counter_get() + WakeUpDelayInSeconds;       /* get TS then set alarm  */
-  rtc_flag_clear(RTC_FLAG_ALARM);
-  rtc_alarm_config(temp);                      /* set alarm */
-  rtc_interrupt_enable(RTC_FLAG_ALARM);        /* RTC alarm on */
-  exti_init(EXTI_17, EXTI_EVENT, EXTI_TRIG_RISING); /* set RTC alarm wake up event */
+  
+    and_register (RTC, RTC_INTEN, ~(1 << 1));   /* RTC alarm off */
+    uint32_t temp = rtc_counter_get() + WakeUpDelayInSeconds;       /* get TS then set alarm  */
+  
+    and_register (RTC, RTC_CTL, ~(1 << 1));   /* Clear alarm flag */
+  
+    rtc_alarm_config(temp);                      /* set alarm */
+  
+    or_register (RTC, RTC_INTEN, (1 << 1));   /* RTC alarm on */
 
+    /* set RTC alarm wake up event */
+
+    and_register (EXTI, EXTI_INTEN, ~(1 << 17));
+    and_register (EXTI, EXTI_EVEN, ~(1 << 17));
+    and_register (EXTI, EXTI_RTEN, ~(1 << 17));
+    and_register (EXTI, EXTI_FTEN, ~(1 << 17));
+    
+    or_register (EXTI, EXTI_EVEN, (1 << 17));
+    or_register (EXTI, EXTI_RTEN, (1 << 17));
+
+    
     write_register (EXTI, EXTI_PD, (1 << 17));
 }
 
@@ -257,54 +344,16 @@ void RtcSetWakeupTimer (uint32_t WakeUpDelayInSeconds)
  */
 void RtcClearWakeupTimer (void)
 {
-  rtc_interrupt_disable(RTC_FLAG_ALARM);   /* RTC alarm off */
-  rtc_flag_clear(RTC_FLAG_ALARM);          /* clear the RTC alarm interrupt flag*/
-  pmu_flag_clear(PMU_FLAG_RESET_WAKEUP);
+    and_register (RTC, RTC_INTEN, ~(1 << 1));   /* RTC alarm off */
+    and_register (RTC, RTC_CTL, ~(1 << 1));     /* clear the RTC alarm interrupt flag*/
+
+    or_register (PMU, PMU_CTL, (1 << 2));       /* Reset wakeup flag */
 }
 
 
-/**
- * @brief   Print the current time to the console
- * @param   none
- * @return  none
- */
-void RtcPrintCurrentTime (void)
-{
-  /* get the current date and time */
-  struct tm DateTime = RtcGetDateTime();
-
-  /* print to console */
-  RtcPrintTime(DateTime);
-}
 
 
-/**
- * @brief   Print the provided timestamp to the console
- * @param   timestamp - the time to print
- * @return  none
- */
-void RtcPrintTimestamp (uint32_t timestamp)
-{
-  /* get the current date and time */
-  struct tm DateTime = RtcTimeStampToDateTime(timestamp);
 
-  /* print to console */
-  RtcPrintTime(DateTime);
-}
-
-
-/**
- * @brief   Print the provided DateTime to the console
- * @param   dateTime - the time to print
- * @return  none
- */
-void RtcPrintTime (struct tm dateTime)
-{
-  /* Display date Format : dd-mm-yy */
-  ConsolePrintf("%02d-%02d-%4d ", dateTime.tm_mday, dateTime.tm_mon + 1, dateTime.tm_year + 1900);
-  /* Display time Format : hh:mm:ss */
-  ConsolePrintf("%02d:%02d:%02d ", dateTime.tm_hour, dateTime.tm_min, dateTime.tm_sec);
-}
 
 
 /**
@@ -379,10 +428,52 @@ void RtcSyncedFlagVerify (bool flag)
 * @param[in]    none
 * @return       {none}
 */
+
+#define NVIC_AIRCR_VECTKEY_MASK     ((uint32_t)0x05FA0000)
+#define NVIC_PRIGROUP_PRE1_SUB3     ((uint32_t)0x600) /*!< 1 bits for pre-emption priority 3 bits for subpriority */
+
+void nvic_irq_enable(uint8_t nvic_irq, uint8_t nvic_irq_pre_priority, 
+                     uint8_t nvic_irq_sub_priority)
+{
+    uint32_t temp_priority = 0x00U, temp_pre = 0x00U, temp_sub = 0x00U;
+    volatile unsigned char *d;
+    
+    temp_pre=1U;
+    temp_sub=0x3U;
+    
+    /* get the temp_priority to fill the NVIC->IP register */
+    
+    temp_priority = (uint32_t)nvic_irq_pre_priority << (0x4U - temp_pre);
+    temp_priority |= nvic_irq_sub_priority &(0x0FU >> (0x4U - temp_sub));
+    temp_priority = temp_priority << 0x04U;
+    
+    d = (volatile unsigned char *) (NVIC + IPR0);
+    
+    d += nvic_irq;
+    
+    *d = (uint8_t) temp_priority;
+    
+    /* enable the selected IRQ */
+    
+    write_register (NVIC, ISER0 + ((nvic_irq >> 0x05U) << 2), (uint32_t)0x01U << (nvic_irq & (uint8_t)0x1FU));
+}
+
 static void nvic_Rtc_configuration (void)
 {
-  nvic_priority_group_set(NVIC_PRIGROUP_PRE1_SUB3);
-  nvic_irq_enable(RTC_IRQn,6,0);
+    
+    write_register (SCB, SCB_AIRCR, NVIC_AIRCR_VECTKEY_MASK | NVIC_PRIGROUP_PRE1_SUB3);
+
+    nvic_irq_enable(3, 6, 0);       /* RTC_irq */
+
 }
 
 
+unsigned long RtcBkupReadRegister (unsigned long reg)
+{
+    return read_register (BKP, reg);
+}
+
+void RtcBkupWriteRegister (unsigned long reg, unsigned long val)
+{
+    write_register (BKP, reg, val);
+}

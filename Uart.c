@@ -117,6 +117,7 @@ static bool     UartPut4            (uint8_t Data)                   {  return(U
 stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
 {
     int UartIndex;
+    int irq;
     
   /* Initialise the circular buffer module and create Tx and Rx buffers for this uart */
 //  UART[UartIndex].RxBufHandle = ringbufferCreate(&UART[UartIndex].RxBuf, cUARTRxBufferSize, 1);
@@ -144,7 +145,9 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
     UART[UartIndex].Stream.SendBuf        = UartSendBuffer0;
 */
     /* Set up GPIO pins for this port */
-      
+
+    irq = 37;       // USART0_IRQn;
+        
     or_register (RCU, RCU_APB2EN, (1 << 14));
     
     set_gpio_input (RXD_FROM_MODEM);
@@ -167,6 +170,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
       
     /* Set up GPIO pins for this port */
       
+    irq = 38;       // USART1_IRQn;
+    
     or_register (RCU, RCU_APB1EN, (1 << 17));
     
     set_gpio_input (RX_FROM_WIFI);
@@ -191,6 +196,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
       
     /* Set up GPIO pins for this port */
 
+    irq = 52;       // UART3_IRQn;
+    
     or_register (RCU, RCU_APB1EN, (1 << 19));
     
     set_gpio_input (DEBUG_RX);
@@ -214,6 +221,8 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
       
     /* Set up GPIO pins for this port */
       
+    irq = 53;       // UART4_IRQn;
+    
     or_register (RCU, RCU_APB1EN, (1 << 20));
     
     set_gpio_input (GNSS_TX);
@@ -245,7 +254,7 @@ stream_t * UARTInitialise (unsigned long base, uartconfig_t * UartConfig)
   }
 
   /* USART interrupt configuration */
-  nvic_irq_enable(UART[UartIndex].IRQn, 5, 0);
+  nvic_irq_enable(irq, 5, 0);
 
   /* enable UART Receive interrupt */
 
@@ -398,7 +407,8 @@ static void UartTxData (uint8_t uartIndex)
     u->UartBusy = true;
 
     /* transmit the next byte */
-    usart_data_transmit(u->Instance, data);      /* send the next data byte */
+    
+    write_register (u->Instance, USART_DATA, data);  /* send the next data byte */
 
   }
   else

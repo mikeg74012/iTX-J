@@ -109,9 +109,19 @@ bool isPCBVersionF (void)
     }
   /* Reset the pull-up of the IO */
     
-    set_gpio_disable_pullup (BOARD_VER_DETECT);
+    set_gpio_disable_pull (BOARD_VER_DETECT);
 
   return (rtnFlag);
+}
+
+void    delay_ms (unsigned long period)
+{
+    unsigned long start_time = ms_timer;
+    
+    
+    while ((ms_timer - start_time) < period)
+    {
+    }
 }
 
 
@@ -142,7 +152,9 @@ bool isPCBVersionDE (void)
   
   /* wait 100 us*/
   
-  delay_us (USER_BUT_DETECT_DELAY);
+  delay_ms (2);
+
+//  delay_us (USER_BUT_DETECT_DELAY);
   
   /* check the pin */
 
@@ -157,7 +169,7 @@ bool isPCBVersionDE (void)
   /* Reset the IOs */
   
   set_gpio_input (DDE_PIN);
-  set_gpio_disable_pullup (DDE_PIN);
+  set_gpio_disable_pull (DDE_PIN);
   set_gpio_input (USER_BUTTON);
   
   return (rtnFlag);
@@ -196,7 +208,7 @@ bool isPCBVersionD2 (void)
 
   
   /* Reset the IOs */
-  set_gpio_disable_pullup (CHRGR_PSEL);
+  set_gpio_disable_pull (CHRGR_PSEL);
 
   return (rtnFlag);
 }

@@ -29,8 +29,10 @@
  *                                    PRIVATE MEMBER VARIABLES
  **************************************************************************************************
  */
+static Queue SequencerQueue;
+static QueueMessage QueueData[SEQUENCER_QUEUE_LENGTH];
+
 static eSequencerState  SequencerState = SS_IDLE;
-static QueueHandle_t    SequencerQueue;
 static uint8_t          msgPara;
 static uint32_t         LastRBCancelTimeStamp = 0;
 
@@ -54,12 +56,14 @@ static void SequencerSMTopLevel       (SequencerMessage_t message);
  * @param     argument (not used)
  * @return    None
  */
+
+
 void SequencerTask (void const * argument)
 {
   SequencerMessage_t  message;
 
   /* create a message queue for this task */
-  SequencerQueue = xQueueCreate(SEQUENCER_QUEUE_LENGTH, sizeof(SequencerMessage_t));
+  xQueueCreate(&SequencerQueue, SEQUENCER_QUEUE_LENGTH, QueueData);
 
   /* initialise the sequence handlers */
   SeqJourneyInit();
@@ -68,7 +72,7 @@ void SequencerTask (void const * argument)
   /* Main task loop */
   for (;;)
   {
-    if (xQueueReceive(SequencerQueue, &message, portMAX_DELAY ) == pdPASS)
+    if (xQueueReceive(&SequencerQueue, &message, portMAX_DELAY ))
     {
       /* process a received message */
       SequencerSMTopLevel(message);
@@ -324,11 +328,11 @@ void SequencerNetworkAbort(void)
  */
 void SequencerEnqueueMessage (uint8_t msgId, void * parameter)
 {
-  SequencerMessage_t message;
+  QueueMessage message;
 
   message.msgId = msgId;
   message.parameter = parameter;
-  xQueueSendToBackFromISR( SequencerQueue, &message, NULL );
+  xQueueSendToBackFromISR( &SequencerQueue, &message, NULL );
 }
 
 

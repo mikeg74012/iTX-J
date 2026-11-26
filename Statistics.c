@@ -76,15 +76,6 @@ void StatisticsInitialize (void)
  */
 void StatisticsPrint (void)
 {
-  ConsolePrintf("*** DEVICE STATISTICS ***\n\r");
-  ConsolePrintf("Charge Cycles     = %d\n\r", Statistics.Battery.ChargeCycles);
-  ConsolePrintf("Last Charge to    = %d%%\n\r", Statistics.Battery.LastChargePercent);
-  ConsolePrintf("Last Charge Time  = ");
-  RtcPrintTimestamp(Statistics.Battery.LastChargeTimestamp);
-  ConsolePrintf("\n\r");
-  ConsolePrintf("Last Charge Last  = %ds\r\n", ((Statistics.Battery.LastChargeEndData >>16) & 0xffff));
-  ConsolePrintf("Last Charge Added = %d%%\r\n", ((Statistics.Battery.LastChargeEndData >>8) & 0xff));
-
 }
 
 

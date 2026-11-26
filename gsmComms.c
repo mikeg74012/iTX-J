@@ -60,6 +60,7 @@ static void      gsmCommsProcessData       (char inChar);
 static eAtResult gsmCommsWaitForResponse   (int timeoutMs);
 static void      gsmCommsProcessBinaryData (uint8_t data);
 
+static unsigned char at_in_progress = 0;
 
 /*
  **************************************************************************************************
@@ -68,9 +69,6 @@ static void      gsmCommsProcessBinaryData (uint8_t data);
  */
 /* UART access */
 static stream_t * pStream;
-
-/* Semaphore used to block calling tasks while AT commands are in process */
-static SemaphoreHandle_t  AtInProcessMutex;
 
 /* response result, capture from ResponseTable or Timeout of Semaphore */
 static eAtResult          AtResult = AT_NONE;
@@ -117,7 +115,6 @@ void GsmCommsTask (void const * argument)
   gsmCommsInit();
 
   /* create a semaphore used to block calling tasks while AT commands are in process */
-  AtInProcessMutex = xSemaphoreCreateBinary();
 
   /* Main task loop */
   for (;;)
@@ -344,7 +341,8 @@ static void gsmCommsProcessData (char inChar)
     case '>':
       AtResult = AT_READY_TO_SEND;
       /* command has completed let the caller know */
-      xSemaphoreGive(AtInProcessMutex);
+      
+      at_in_progress = 0;
       break;
     default:
       GsmBufIndex = 0;
@@ -377,7 +375,7 @@ static void gsmCommsProcessData (char inChar)
         if ((AT_COMPLETE == AtResult) || (AT_ERROR == AtResult))
         {
           /* command has completed so let the caller know */
-          xSemaphoreGive(AtInProcessMutex);
+            at_in_progress = 0;
         }
       }
       /* change state */
@@ -400,16 +398,35 @@ static void gsmCommsProcessData (char inChar)
  */
 eAtResult gsmCommsIssueWaitForResponse (int waitTimeMs)
 {
+    unsigned long start_time;
+    
   WaitingForResponse = true;
 
   /*
    * Wait for command to complete or timeout
    * WARNING - this blocks the calling task
    */
-  if (xSemaphoreTake(AtInProcessMutex, waitTimeMs/portTICK_PERIOD_MS ) != pdTRUE )
-  {
-    AtResult = AT_TIMEOUT;
-  }
+  
+  start_time = ms_timer;
+  
+  at_in_progress = 1;
+
+    for (;;)
+    {
+        if ((ms_timer - start_time) >= (unsigned long) waitTimeMs)
+        {
+            AtResult = AT_TIMEOUT;
+        }
+        
+        if (!at_in_progress)
+        {
+            break;
+        }
+
+            sleep(1);
+    }
+    
+  
 
   /* When come here, AtInProcessMutex Unblocked,
    * either Modem response or timeout
